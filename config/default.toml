@@ -1,0 +1,78 @@
+[agent]
+name = "SIM-Agent"
+version = "0.1.0"
+data_dir = "data"
+
+[llm]
+default_provider = "openai"
+
+[llm.openai]
+api_key = ""  # Set via SIM_LLM_OPENAI_API_KEY env var
+models = ["gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo"]
+base_url = ""  # Optional custom base URL
+
+[llm.anthropic]
+api_key = ""  # Set via SIM_LLM_ANTHROPIC_API_KEY env var
+models = ["claude-3-5-sonnet-20241022", "claude-3-haiku-20240307"]
+
+[payment]
+default_provider = "alipay"
+
+[payment.alipay]
+app_id = ""  # Set via SIM_PAYMENT_ALIPAY_APP_ID env var
+private_key_path = ""  # RSA2 private key file path
+alipay_public_key_path = ""  # Alipay public key file path
+gateway_url = "https://openapi.alipay.com/gateway.do"
+sandbox = true  # Use sandbox environment for development
+notify_url = ""  # Async notification callback URL
+
+[cloud]
+default_provider = "aliyun"
+
+[cloud.aliyun]
+access_key_id = ""  # Set via SIM_CLOUD_ALIYUN_ACCESS_KEY_ID env var
+access_key_secret = ""  # Set via SIM_CLOUD_ALIYUN_ACCESS_KEY_SECRET env var
+region_id = "cn-hangzhou"
+default_instance_type = "ecs.t6-c1m1.large"
+default_image_id = "ubuntu_22_04_x64_20G_alibase_20240130.vhd"
+security_group_id = ""
+vswitch_id = ""
+
+[survival]
+normal_threshold_usd = 50.0
+low_compute_threshold_usd = 10.0
+critical_threshold_usd = 1.0
+
+[survival.intervals]
+normal_heartbeat_sec = 5
+low_compute_heartbeat_sec = 30
+critical_heartbeat_sec = 60
+normal_loop_sec = 3
+low_compute_loop_sec = 15
+critical_loop_sec = 30
+
+[survival.models]
+normal = ["gpt-4o", "claude-3-5-sonnet-20241022"]
+low_compute = ["gpt-4o-mini", "claude-3-haiku-20240307"]
+critical = ["gpt-3.5-turbo"]
+
+[memory]
+chromadb_path = "data/chromadb"
+top_k = 5
+
+[income]
+api_port = 8402
+api_host = "0.0.0.0"
+github_token = ""  # Set via SIM_INCOME__GITHUB_TOKEN env var
+
+[self_mod]
+watchdog_timeout_sec = 30
+snapshot_dir = "data/snapshots"
+max_snapshots = 5
+
+[creator]
+# Creator revenue share configuration
+share_percentage = 30  # Creator gets 30% of all income
+share_pause_threshold_usd = 5.0  # Pause sharing when balance drops below this
+payout_method = "alipay"  # Payment method for creator payouts
+creator_account = ""  # Creator's payment account (e.g., Alipay account)

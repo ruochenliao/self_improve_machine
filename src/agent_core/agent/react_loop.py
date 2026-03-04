@@ -1,0 +1,172 @@
+"""ReAct loop engine: Observe -> Think -> Act -> Reflect."""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import time
+from typing import TYPE_CHECKING
+
+import structlog
+
+if TYPE_CHECKING:
+    from agent_core.agent.constitution import ConstitutionGuard
+    from agent_core.agent.context import ContextManager
+    from agent_core.economy.ledger import Ledger
+    from agent_core.llm.router import ModelRouter
+    from agent_core.memory.experience import ExperienceManager
+    from agent_core.survival.state_machine import SurvivalStateMachine
+    from agent_core.tools.registry import ToolRegistry
+
+logger = structlog.get_logger()
+
+
+class ReActLoop:
+    """Core ReAct reasoning loop: observe -> think -> act -> reflect."""
+
+    def __init__(
+        self,
+        context_manager: ContextManager,
+        model_router: ModelRouter,
+        tool_registry: ToolRegistry,
+        state_machine: SurvivalStateMachine,
+        constitution: ConstitutionGuard,
+        experience_manager: ExperienceManager,
+        ledger: Ledger,
+    ) -> None:
+        self._context = context_manager
+        self._router = model_router
+        self._tools = tool_registry
+        self._state_machine = state_machine
+        self._constitution = constitution
+        self._experience = experience_manager
+        self._ledger = ledger
+        self._cycle_count = 0
+        self._stop_event = asyncio.Event()
+        self._current_tool_task: asyncio.Task | None = None
+
+    async def run(self) -> None:
+        """Run the main ReAct loop until stopped or dead."""
+        logger.info("react_loop.started")
+
+        while not self._stop_event.is_set() and self._state_machine.is_alive():
+            try:
+                await self._cycle()
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error("react_loop.cycle_error", error=str(e), cycle=self._cycle_count)
+
+            # Sleep based on current tier
+            interval = self._state_machine.get_current_config().loop_interval_sec
+            try:
+                await asyncio.wait_for(self._stop_event.wait(), timeout=interval)
+                break  # Stop event was set
+            except asyncio.TimeoutError:
+                pass  # Normal: timeout means keep going
+
+        reason = "stopped" if self._stop_event.is_set() else "dead"
+        logger.warning("react_loop.ended", reason=reason, cycles=self._cycle_count)
+
+    async def _cycle(self) -> None:
+        """Execute one ReAct cycle."""
+        self._cycle_count += 1
+        tier = self._state_machine.current_tier.value
+        cycle_start = time.time()
+
+        logger.info("react_loop.cycle_start", cycle=self._cycle_count, tier=tier)
+
+        # 1. OBSERVE: Build context
+        observation = self._build_observation()
+        messages = self._context.get_messages(observation)
+
+        # 2. THINK: LLM reasoning
+        response = await self._router.chat(
+            messages=messages,
+            tier=tier,
+            tools=self._tools.get_tool_schemas(),
+        )
+
+        total_cost = response.usage.total_cost_usd
+
+        # 3. ACT: Execute tool calls
+        max_calls = self._state_machine.get_current_config().max_tool_calls_per_cycle
+        actions_taken = []
+
+        if response.tool_calls:
+            for i, tc in enumerate(response.tool_calls[:max_calls]):
+                # Constitution check
+                allowed, reason = self._constitution.validate_action(tc.name, tc.arguments)
+                if not allowed:
+                    logger.warning("react_loop.action_blocked", action=tc.name, reason=reason)
+                    actions_taken.append({
+                        "action": tc.name,
+                        "result": f"BLOCKED: {reason}",
+                        "success": False,
+                    })
+                    continue
+
+                # Execute tool
+                self._current_tool_task = asyncio.current_task()
+                result = await self._tools.execute(tc.name, tc.arguments)
+                self._current_tool_task = None
+
+                actions_taken.append({
+                    "action": f"{tc.name}({json.dumps(tc.arguments)[:100]})",
+                    "result": result.output[:200] if result.success else result.error[:200],
+                    "success": result.success,
+                })
+
+                self._context.add_action_to_history(actions_taken[-1])
+
+        # Record LLM cost as expense
+        if total_cost > 0:
+            await self._ledger.record_expense(
+                total_cost,
+                category="llm",
+                description=f"Cycle {self._cycle_count} ({response.model})",
+                counterparty=response.model,
+            )
+
+        # 4. REFLECT: Record experience
+        for action in actions_taken:
+            self._experience.record(
+                action=action["action"],
+                result=action["result"],
+                success=action["success"],
+                reflection=response.content[:200] if response.content else "",
+                cost_usd=total_cost / max(len(actions_taken), 1),
+            )
+
+        elapsed = time.time() - cycle_start
+        logger.info(
+            "react_loop.cycle_end",
+            cycle=self._cycle_count,
+            actions=len(actions_taken),
+            cost=f"${total_cost:.6f}",
+            elapsed=f"{elapsed:.2f}s",
+        )
+
+    def _build_observation(self) -> str:
+        """Build the observation string for the current cycle."""
+        status = self._state_machine.get_status()
+        parts = [
+            f"Cycle #{self._cycle_count}",
+            f"Tier: {status['tier']}",
+            f"Balance: ${status['balance_usd']:.2f}",
+            f"Alive: {status['is_alive']}",
+        ]
+        return " | ".join(parts)
+
+    def request_stop(self) -> None:
+        """Request the loop to stop gracefully."""
+        self._stop_event.set()
+        logger.info("react_loop.stop_requested")
+
+    @property
+    def cycle_count(self) -> int:
+        return self._cycle_count
+
+    @property
+    def is_running(self) -> bool:
+        return not self._stop_event.is_set() and self._state_machine.is_alive()
