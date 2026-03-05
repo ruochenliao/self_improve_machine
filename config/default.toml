@@ -57,9 +57,9 @@ critical_threshold_usd = 0.50
 normal_heartbeat_sec = 5
 low_compute_heartbeat_sec = 60
 critical_heartbeat_sec = 120
-normal_loop_sec = 5
-low_compute_loop_sec = 30
-critical_loop_sec = 60
+normal_loop_sec = 10
+low_compute_loop_sec = 120
+critical_loop_sec = 300
 
 [survival.models]
 normal = ["gpt-4o", "gpt-4o-mini", "deepseek-chat"]
@@ -74,6 +74,9 @@ top_k = 5
 api_port = 8402
 api_host = "0.0.0.0"
 github_token = ""  # Set via SIM_INCOME__GITHUB_TOKEN env var
+# Personal payment QR code URLs (for self-service key purchases)
+alipay_qr_url = "/static/AliPay_receive_money_sq_code.jpg"  # URL to your Alipay personal receive QR image
+wechat_qr_url = "/static/wechat_receive_money_sql_code.png"  # URL to your WeChat personal receive QR image
 
 [self_mod]
 watchdog_timeout_sec = 30

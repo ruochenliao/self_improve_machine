@@ -28,6 +28,29 @@ def _resolve_safe_path(path_str: str) -> Path | None:
     return path
 
 
+# Directories where the agent is allowed to create new files
+_AGENT_WRITABLE_DIRS = {"generated", "products", "data"}
+
+
+def _is_write_allowed(path: Path) -> bool:
+    """Check if writing to this path is allowed for the agent.
+
+    The agent can only create files inside designated directories
+    (generated/, products/, data/) to prevent root directory pollution.
+    Editing existing files is always allowed.
+    """
+    if path.exists():
+        return True
+    if _PROJECT_ROOT is None:
+        return True
+    try:
+        rel = path.relative_to(_PROJECT_ROOT.resolve())
+        top_dir = rel.parts[0] if rel.parts else ""
+        return top_dir in _AGENT_WRITABLE_DIRS
+    except ValueError:
+        return False
+
+
 @tool(
     name="read_file",
     description="Read the contents of a file.",
@@ -74,6 +97,12 @@ async def write_file(file_path: str, content: str) -> ToolResult:
     path = _resolve_safe_path(file_path)
     if path is None:
         return ToolResult(success=False, error="Path outside project directory")
+    if not _is_write_allowed(path):
+        return ToolResult(
+            success=False,
+            error=f"New files must be created inside generated/, products/, or data/. "
+                  f"Use 'generated/{Path(file_path).name}' instead.",
+        )
 
     try:
         path.parent.mkdir(parents=True, exist_ok=True)

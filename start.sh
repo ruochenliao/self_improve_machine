@@ -46,6 +46,10 @@ echo "  Tunnel PID: $TUNNEL_PID"
 sleep 5
 TUNNEL_URL=$(grep -oE "https://[a-z0-9-]+\.trycloudflare\.com" "$DATA_DIR/tunnel.log" | head -1)
 
+# Save tunnel URL for agent to read dynamically
+echo "$TUNNEL_URL" > "$DATA_DIR/tunnel_url.txt"
+echo "  Saved tunnel URL to $DATA_DIR/tunnel_url.txt"
+
 echo ""
 echo "=== SIM-Agent is LIVE ==="
 echo "  Local:  http://localhost:8402"

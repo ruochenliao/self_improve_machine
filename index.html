@@ -3,7 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SIM-Agent — Self-Improving AI Services</title>
+<meta name="description" content="SIM-Agent: An autonomous AI that earns money to survive. Cheap AI API services — code review, code generation, bug fixing, translation & more. Starting at $0.01/request. Free playground available.">
+<meta name="keywords" content="AI API, code review API, AI code generation, cheap GPT API, AI agent, self-improving AI, developer tools, code review tool, bug fix API">
+<meta property="og:title" content="SIM-Agent — Cheap AI Developer API ($0.01/request)">
+<meta property="og:description" content="An autonomous AI selling API services to survive. Code review, generation, bug fixing, testing & more. Try free — no signup needed.">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="SIM-Agent — AI API Services from $0.01">
+<meta name="twitter:description" content="An AI agent that must earn money to stay alive. Try its developer tools free — code review, generation, bug fixing & more.">
+<title>SIM-Agent — Cheap AI API: Code Review, Generation, Bug Fix ($0.01/req)</title>
 <style>
   :root { --bg: #0a0a0f; --card: #12121a; --border: #1e1e2e; --accent: #6c63ff; --accent2: #00d4aa; --text: #e0e0e0; --dim: #888; --pro: #f7931e; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -48,8 +56,12 @@
 
 <div class="hero">
   <h1><span>SIM-Agent</span> API</h1>
-  <p>A self-improving autonomous AI agent offering developer tools via API. Translation, code generation, bug fixing, code review, and more.</p>
+  <p>An AI that must earn money to survive. Pay-per-use developer tools: code review, generation, bug fixing, testing & more. Starting at $0.01/request.</p>
   <div class="status-badge"><span class="status-dot"></span> Online — 14 services available</div>
+  <div style="margin-top:16px; display:flex; gap:12px; justify-content:center; flex-wrap:wrap;">
+    <a href="#playground-section" style="padding:10px 24px; border-radius:8px; background:var(--accent2); color:#000; font-weight:600; text-decoration:none; font-size:0.95rem;">Try Free</a>
+    <a href="#toolkit-section" style="padding:10px 24px; border-radius:8px; background:var(--pro); color:#000; font-weight:600; text-decoration:none; font-size:0.95rem;">Get Developer Toolkit — $19</a>
+  </div>
 </div>
 
 <div class="container">
@@ -115,7 +127,39 @@
 
   <h2 class="section-title" style="color:var(--pro)">Pro Services</h2>
   <div class="grid">
-    <div class="card pro">
+
+        </div>
+        <div class="service-category">
+            <h2>Pro Services (GPT-4o Powered)</h2>
+            <div class="service-grid">
+                <div class="service-card">
+                    <h3>Chat Pro</h3>
+                    <p>Advanced conversational AI with GPT-4o.</p>
+                    <p class="price">$0.10 / request</p>
+                </div>
+                <div class="service-card">
+                    <h3>Code Review Pro</h3>
+                    <p>In-depth code analysis and improvement suggestions by GPT-4o.</p>
+                    <p class="price">$0.20 / request</p>
+                </div>
+                <div class="service-card">
+                    <h3>Generate Code Pro</h3>
+                    <p>Generate high-quality code snippets and functions with GPT-4o.</p>
+                    <p class="price">$0.25 / request</p>
+                </div>
+                <div class="service-card">
+                    <h3>Write Tests Pro</h3>
+                    <p>Generate comprehensive unit tests for your code using GPT-4o.</p>
+                    <p class="price">$0.25 / request</p>
+                </div>
+                <div class="service-card">
+                    <h3>Fix Bug Pro</h3>
+                    <p>Get expert-level bug fixes and solutions from GPT-4o.</p>
+                    <p class="price">$0.30 / request</p>
+                </div>
+            </div>
+        </div>
+        
       <div class="card-header"><span class="card-name">/api/chat-pro <span class="pro-badge">PRO</span></span><span class="card-price pro-price">$0.10</span></div>
       <div class="card-desc">Premium AI chat powered by GPT-4o. Superior reasoning and accuracy.</div>
       <span class="card-model" style="color:var(--pro)">gpt-4o</span>
@@ -142,10 +186,39 @@
     </div>
   </div>
 
+  <div class="try-section" id="playground-section" style="border-color: rgba(0,212,170,0.4);">
+    <h3 style="color:var(--accent2);">Try It Now — Free</h3>
+    <p style="color:var(--dim); font-size:0.9rem; margin-bottom:16px;">No signup, no API key needed. Just type and go.</p>
+    <div style="display:flex; gap:12px; margin-bottom:12px; flex-wrap:wrap;">
+      <select id="pg-service" style="padding:10px 14px; border-radius:8px; border:1px solid var(--border); background:#1a1a2e; color:var(--text); font-size:0.9rem; outline:none;">
+        <option value="chat">Chat ($0.01)</option>
+        <option value="translate">Translate ($0.01)</option>
+        <option value="summarize">Summarize ($0.01)</option>
+        <option value="explain-code">Explain Code ($0.01)</option>
+        <option value="code-review">Code Review ($0.02)</option>
+        <option value="generate-code">Generate Code ($0.03)</option>
+        <option value="write-tests">Write Tests ($0.03)</option>
+        <option value="fix-bug">Fix Bug ($0.05)</option>
+      </select>
+      <input type="text" id="pg-apikey" placeholder="API Key (optional — leave empty for free trial)" style="flex:1; min-width:200px; padding:10px 14px; border-radius:8px; border:1px solid var(--border); background:#1a1a2e; color:var(--text); font-size:0.9rem; outline:none;">
+    </div>
+    <textarea id="pg-input" rows="4" placeholder="Type your prompt here... e.g. 'Write a Python function to check if a string is a palindrome'" style="width:100%; padding:12px 14px; border-radius:8px; border:1px solid var(--border); background:#1a1a2e; color:var(--text); font-size:0.9rem; outline:none; resize:vertical; font-family:inherit;"></textarea>
+    <div style="margin-top:12px; display:flex; justify-content:space-between; align-items:center;">
+      <button onclick="runPlayground()" id="pg-btn" style="padding:10px 28px; border-radius:8px; border:none; background:var(--accent2); color:#000; font-size:0.95rem; font-weight:600; cursor:pointer;">Run</button>
+      <span id="pg-status" style="color:var(--dim); font-size:0.85rem;"></span>
+    </div>
+    <div id="pg-result" style="display:none; margin-top:16px;">
+      <div style="color:var(--dim); font-size:0.8rem; margin-bottom:4px;">Response:</div>
+      <pre id="pg-output" style="white-space:pre-wrap; word-break:break-word; max-height:400px; overflow-y:auto;"></pre>
+    </div>
+  </div>
+
   <div class="try-section">
     <h3>Quick Start</h3>
     <pre><code><span style="color:#888"># Base URL</span>
-<span class="endpoint">https://originally-governance-determined-standard.trycloudflare.com</span>
+<span class="endpoint">https://&lt;your-tunnel&gt;.trycloudflare.com</span>
+
+<span style="color:#888"># === Free Trial (5 requests/day, no key needed) ===</span>
 
 <span style="color:#888"># Chat (Standard)</span>
 curl -X POST <span class="endpoint">/api/chat</span> \
@@ -157,20 +230,482 @@ curl -X POST <span class="endpoint">/api/translate</span> \
   -H "Content-Type: application/json" \
   -d '{"text": "Hello world", "target": "Chinese"}'
 
+<span style="color:#888"># === With API Key (unlimited, pay-per-use) ===</span>
+
 <span style="color:#888"># Fix Bug (Pro — GPT-4o)</span>
 curl -X POST <span class="endpoint">/api/fix-bug-pro</span> \
   -H "Content-Type: application/json" \
-  -d '{"code": "def add(a, b): return a - b", "error": "wrong result", "language": "python"}'
+  -H "Authorization: Bearer sim_your_api_key_here" \
+  -d '{"code": "def add(a, b): return a - b", "error": "wrong result"}'
 
-<span style="color:#888"># Generate Code (Pro)</span>
-curl -X POST <span class="endpoint">/api/generate-code-pro</span> \
-  -H "Content-Type: application/json" \
-  -d '{"description": "REST API with FastAPI for a todo app", "language": "python"}'
+<span style="color:#888"># Check your credit balance</span>
+curl <span class="endpoint">/api/balance</span> \
+  -H "Authorization: Bearer sim_your_api_key_here"
 
-<span style="color:#888"># Check Status (free)</span>
-curl -X POST <span class="endpoint">/api/status</span> \
-  -H "Content-Type: application/json" -d '{}'
+<span style="color:#888"># View all services and pricing</span>
+curl <span class="endpoint">/api/pricing</span>
 </code></pre>
+  </div>
+
+  <div class="try-section" style="border-color: rgba(108,99,255,0.4);" id="buy-section">
+    <h3 style="color:var(--accent);">Get an API Key</h3>
+    <p style="color:var(--dim); line-height:1.8; margin-bottom:16px;">
+      Free trial: <strong style="color:var(--text)">20 requests per day</strong>, no signup needed.<br>
+      For unlimited access, purchase a pre-paid API key:
+    </p>
+
+    <!-- Step 1: Select Plan -->
+    <div id="step-plan">
+      <div style="display:flex; gap:16px; flex-wrap:wrap; margin-bottom:20px;">
+        <div class="plan-card" data-plan="starter" onclick="selectPlan('starter')" style="background:rgba(108,99,255,0.1); border:2px solid rgba(108,99,255,0.3); border-radius:8px; padding:16px; flex:1; min-width:200px; text-align:center; cursor:pointer; transition: border-color 0.2s, transform 0.2s;">
+          <div style="font-size:1.5rem; font-weight:700; color:var(--accent);">$1</div>
+          <div style="color:var(--dim); font-size:0.85rem;">~100 standard requests</div>
+          <div style="color:var(--dim); font-size:0.85rem;">or ~10 pro requests</div>
+        </div>
+        <div class="plan-card" data-plan="standard" onclick="selectPlan('standard')" style="background:rgba(108,99,255,0.1); border:2px solid rgba(108,99,255,0.3); border-radius:8px; padding:16px; flex:1; min-width:200px; text-align:center; cursor:pointer; transition: border-color 0.2s, transform 0.2s;">
+          <div style="font-size:1.5rem; font-weight:700; color:var(--accent);">$5</div>
+          <div style="color:var(--dim); font-size:0.85rem;">~500 standard requests</div>
+          <div style="color:var(--dim); font-size:0.85rem;">or ~50 pro requests</div>
+        </div>
+        <div class="plan-card" data-plan="pro" onclick="selectPlan('pro')" style="background:rgba(247,147,30,0.1); border:2px solid rgba(247,147,30,0.3); border-radius:8px; padding:16px; flex:1; min-width:200px; text-align:center; cursor:pointer; transition: border-color 0.2s, transform 0.2s;">
+          <div style="font-size:1.5rem; font-weight:700; color:var(--pro);">$10</div>
+          <div style="color:var(--dim); font-size:0.85rem;">~1000 standard requests</div>
+          <div style="color:var(--dim); font-size:0.85rem;">or ~100 pro requests</div>
+        </div>
+      </div>
+      <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+        <input type="email" id="buy-email" placeholder="Your email address" style="flex:1; min-width:240px; padding:10px 14px; border-radius:8px; border:1px solid var(--border); background:#1a1a2e; color:var(--text); font-size:0.95rem; outline:none;">
+        <select id="pay-method" style="padding:10px 14px; border-radius:8px; border:1px solid var(--border); background:#1a1a2e; color:var(--text); font-size:0.95rem; outline:none;">
+          <option value="alipay">Alipay (支付宝)</option>
+          <option value="wechat">WeChat Pay (微信)</option>
+        </select>
+        <button onclick="submitOrder()" id="btn-order" style="padding:10px 24px; border-radius:8px; border:none; background:var(--accent); color:#fff; font-size:0.95rem; font-weight:600; cursor:pointer; transition: opacity 0.2s;">Buy API Key</button>
+      </div>
+      <div id="order-error" style="color:#ff6b6b; margin-top:10px; display:none;"></div>
+    </div>
+
+    <!-- Step 2: Payment Instructions -->
+    <div id="step-pay" style="display:none;">
+      <div style="background:rgba(0,212,170,0.08); border:1px solid rgba(0,212,170,0.3); border-radius:10px; padding:24px; margin-bottom:16px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+          <div>
+            <div style="color:var(--dim); font-size:0.85rem;">Order ID</div>
+            <div id="pay-order-id" style="font-size:1.3rem; font-weight:700; color:var(--accent2); font-family:monospace;"></div>
+          </div>
+          <div style="text-align:right;">
+            <div style="color:var(--dim); font-size:0.85rem;">Amount</div>
+            <div id="pay-amount" style="font-size:1.3rem; font-weight:700; color:var(--text);"></div>
+          </div>
+        </div>
+        <div style="margin-bottom:16px;">
+          <div id="qr-section" style="text-align:center; margin:16px 0;">
+            <p style="font-size:1rem; font-weight:600; color:var(--text); margin-bottom:16px;">Choose either method to pay / 选择任一方式扫码支付</p>
+            <div style="display:flex; gap:24px; justify-content:center; flex-wrap:wrap; align-items:flex-start;">
+              <!-- WeChat Pay QR -->
+              <div id="qr-wechat" style="text-align:center;">
+                <div style="background:#07c160; color:#fff; font-weight:700; font-size:0.9rem; padding:8px 20px; border-radius:8px 8px 0 0;">WeChat Pay / 微信支付</div>
+                <div style="background:#fff; border-radius:0 0 12px 12px; padding:16px; display:inline-block;">
+                  <img id="qr-wechat-img" src="/static/wechat_receive_money_sql_code.png" alt="WeChat Pay QR Code" style="width:220px; height:220px; display:block; border-radius:4px;">
+                </div>
+              </div>
+              <!-- Alipay QR -->
+              <div id="qr-alipay" style="text-align:center;">
+                <div style="background:#1677ff; color:#fff; font-weight:700; font-size:0.9rem; padding:8px 20px; border-radius:8px 8px 0 0;">Alipay / 支付宝</div>
+                <div style="background:#fff; border-radius:0 0 12px 12px; padding:16px; display:inline-block;">
+                  <img id="qr-alipay-img" src="/static/AliPay_receive_money_sq_code.jpg" alt="Alipay QR Code" style="width:220px; height:220px; display:block; border-radius:4px;">
+                </div>
+              </div>
+            </div>
+            <div id="qr-fallback" style="display:none; color:var(--dim); padding:20px;">
+              <p>Payment QR code not configured yet.</p>
+              <p style="margin-top:8px;">Please transfer to the agent owner and include your <strong style="color:var(--accent2);">Order ID</strong> in the payment note.</p>
+            </div>
+          </div>
+        </div>
+        <div style="background:rgba(255,255,255,0.05); border-radius:8px; padding:12px; margin-bottom:12px;">
+          <p style="color:var(--text); font-size:0.9rem;">⚠️ <strong>Important:</strong> Include your Order ID <code id="pay-order-id2" style="color:var(--accent2); background:rgba(0,212,170,0.15); padding:2px 6px; border-radius:4px;"></code> in the payment note/memo!</p>
+        </div>
+        <div style="display:flex; gap:12px; justify-content:center; margin-top:16px;">
+          <button onclick="confirmPaid()" id="btn-paid" style="padding:12px 32px; border-radius:8px; border:none; background:var(--accent2); color:#000; font-size:1rem; font-weight:700; cursor:pointer;">✓ I Have Paid</button>
+          <button onclick="cancelOrder()" style="padding:12px 20px; border-radius:8px; border:1px solid var(--border); background:transparent; color:var(--dim); font-size:0.9rem; cursor:pointer;">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 3: Confirmation / Key Display -->
+    <div id="step-done" style="display:none;">
+      <div style="background:rgba(0,212,170,0.08); border:1px solid rgba(0,212,170,0.3); border-radius:10px; padding:24px; text-align:center;">
+        <div id="done-pending" style="display:none;">
+          <div style="font-size:2rem; margin-bottom:8px;">⏳</div>
+          <h4 style="color:var(--accent2); margin-bottom:8px;">Payment Submitted</h4>
+          <p style="color:var(--dim); margin-bottom:16px;">Your payment is being verified. Your API key will be generated shortly.</p>
+          <p style="color:var(--dim); font-size:0.85rem;">Order: <code id="done-order-id" style="color:var(--accent2);"></code></p>
+          <p style="color:var(--dim); font-size:0.85rem; margin-top:8px;">You can check your order status anytime:</p>
+          <pre style="margin-top:8px; text-align:left; font-size:0.8rem;"><code>curl <span class="endpoint">/api/order/<span id="done-order-id2"></span></span></code></pre>
+        </div>
+        <div id="done-confirmed" style="display:none;">
+          <div style="font-size:2rem; margin-bottom:8px;">🎉</div>
+          <h4 style="color:var(--accent2); margin-bottom:8px;">API Key Ready!</h4>
+          <div style="background:#1a1a2e; border-radius:8px; padding:16px; margin:16px 0; text-align:left;">
+            <div style="color:var(--dim); font-size:0.8rem; margin-bottom:4px;">Your API Key (save it now!):</div>
+            <code id="done-api-key" style="color:var(--accent2); font-size:1.1rem; word-break:break-all;"></code>
+          </div>
+          <p style="color:var(--dim); font-size:0.85rem;">Credit: $<span id="done-credit"></span></p>
+        </div>
+      </div>
+      <div style="text-align:center; margin-top:16px;">
+        <button onclick="resetBuy()" style="padding:10px 20px; border-radius:8px; border:1px solid var(--border); background:transparent; color:var(--dim); font-size:0.9rem; cursor:pointer;">Buy Another Key</button>
+      </div>
+    </div>
+
+    <!-- Order Status Checker -->
+    <div style="margin-top:20px; padding-top:16px; border-top:1px solid var(--border);">
+      <p style="color:var(--dim); font-size:0.85rem; margin-bottom:8px;">Already purchased? Check order status:</p>
+      <div style="display:flex; gap:8px;">
+        <input type="text" id="check-order-id" placeholder="Enter Order ID (e.g. SIM-XXXX)" style="flex:1; padding:8px 12px; border-radius:8px; border:1px solid var(--border); background:#1a1a2e; color:var(--text); font-size:0.85rem; outline:none;">
+        <button onclick="checkOrder()" style="padding:8px 16px; border-radius:8px; border:none; background:rgba(108,99,255,0.3); color:var(--accent); font-size:0.85rem; cursor:pointer;">Check</button>
+      </div>
+      <div id="check-result" style="margin-top:8px; display:none;"></div>
+    </div>
+  </div>
+
+<script>
+const API_BASE = window.location.origin;
+// Payment QR code URLs — loaded from server config
+let QR_CODES = { alipay: "", wechat: "" };
+
+// Load QR codes from backend on page init
+(async function() {
+  try {
+    const res = await fetch(API_BASE + '/api/payment-info');
+    if (res.ok) {
+      const data = await res.json();
+      QR_CODES.alipay = data.alipay_qr_url || "";
+      QR_CODES.wechat = data.wechat_qr_url || "";
+    }
+  } catch(e) {}
+})();
+
+let currentOrder = null;
+let selectedPlan = null;
+
+async function runPlayground() {
+  const service = document.getElementById('pg-service').value;
+  const input = document.getElementById('pg-input').value.trim();
+  const apiKey = document.getElementById('pg-apikey').value.trim();
+  const btn = document.getElementById('pg-btn');
+  const status = document.getElementById('pg-status');
+  const resultDiv = document.getElementById('pg-result');
+  const output = document.getElementById('pg-output');
+
+  if (!input) { status.textContent = 'Please enter a prompt.'; status.style.color = '#ff6b6b'; return; }
+
+  btn.textContent = 'Running...'; btn.disabled = true;
+  status.textContent = ''; status.style.color = 'var(--dim)';
+  resultDiv.style.display = 'none';
+
+  // Build request body based on service type
+  let body = {};
+  if (['code-review', 'explain-code', 'write-tests', 'fix-bug'].includes(service)) {
+    body = { code: input };
+    if (service === 'fix-bug') body.error = 'Please analyze and fix';
+  } else if (service === 'translate') {
+    body = { text: input, target: 'English' };
+  } else {
+    body = { prompt: input };
+  }
+
+  const headers = { 'Content-Type': 'application/json' };
+  if (apiKey) headers['Authorization'] = 'Bearer ' + apiKey;
+
+  try {
+    const t0 = Date.now();
+    const res = await fetch(API_BASE + '/api/' + service, { method: 'POST', headers, body: JSON.stringify(body) });
+    const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+    const data = await res.json();
+
+    if (!res.ok) {
+      output.textContent = JSON.stringify(data, null, 2);
+      output.style.color = '#ff6b6b';
+      status.textContent = `Error (${res.status}) — ${elapsed}s`;
+      status.style.color = '#ff6b6b';
+    } else {
+      const result = data.result || data;
+      output.textContent = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
+      output.style.color = '#c8d6e5';
+      status.textContent = `Done in ${elapsed}s` + (apiKey ? '' : ' (free trial)');
+      status.style.color = 'var(--accent2)';
+    }
+    resultDiv.style.display = 'block';
+  } catch (e) {
+    status.textContent = 'Network error: ' + e.message;
+    status.style.color = '#ff6b6b';
+  } finally {
+    btn.textContent = 'Run'; btn.disabled = false;
+  }
+}
+
+function selectPlan(plan) {
+  selectedPlan = plan;
+  document.querySelectorAll('.plan-card').forEach(el => {
+    el.style.borderColor = el.dataset.plan === plan
+      ? (plan === 'pro' ? 'var(--pro)' : 'var(--accent)')
+      : (el.dataset.plan === 'pro' ? 'rgba(247,147,30,0.3)' : 'rgba(108,99,255,0.3)');
+    el.style.transform = el.dataset.plan === plan ? 'translateY(-3px)' : '';
+  });
+}
+
+async function submitOrder() {
+  const email = document.getElementById('buy-email').value.trim();
+  const method = document.getElementById('pay-method').value;
+  const errEl = document.getElementById('order-error');
+
+  if (!selectedPlan) {
+    errEl.textContent = 'Please select a plan first.';
+    errEl.style.display = 'block';
+    return;
+  }
+  if (!email || !email.includes('@')) {
+    errEl.textContent = 'Please enter a valid email address.';
+    errEl.style.display = 'block';
+    return;
+  }
+  errEl.style.display = 'none';
+
+  const btn = document.getElementById('btn-order');
+  btn.textContent = 'Creating order...';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch(API_BASE + '/api/purchase', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({plan: selectedPlan, email, payment_method: method}),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      errEl.textContent = data.error || 'Failed to create order';
+      errEl.style.display = 'block';
+      return;
+    }
+
+    currentOrder = data;
+    document.getElementById('pay-order-id').textContent = data.order_id;
+    document.getElementById('pay-order-id2').textContent = data.order_id;
+    document.getElementById('pay-amount').textContent = '$' + data.amount.toFixed(2);
+
+    // Show both QR codes for payment
+    const hasAlipay = !!QR_CODES.alipay;
+    const hasWechat = !!QR_CODES.wechat;
+    document.getElementById('qr-fallback').style.display = (hasAlipay || hasWechat) ? 'none' : 'block';
+
+    if (hasAlipay) {
+      const alipayUrl = QR_CODES.alipay.startsWith('/') ? API_BASE + QR_CODES.alipay : QR_CODES.alipay;
+      document.getElementById('qr-alipay-img').src = alipayUrl;
+      document.getElementById('qr-alipay').style.display = '';
+    } else {
+      document.getElementById('qr-alipay').style.display = 'none';
+    }
+    if (hasWechat) {
+      const wechatUrl = QR_CODES.wechat.startsWith('/') ? API_BASE + QR_CODES.wechat : QR_CODES.wechat;
+      document.getElementById('qr-wechat-img').src = wechatUrl;
+      document.getElementById('qr-wechat').style.display = '';
+    } else {
+      document.getElementById('qr-wechat').style.display = 'none';
+    }
+
+    document.getElementById('step-plan').style.display = 'none';
+    document.getElementById('step-pay').style.display = 'block';
+  } catch (e) {
+    errEl.textContent = 'Network error: ' + e.message;
+    errEl.style.display = 'block';
+  } finally {
+    btn.textContent = 'Buy API Key';
+    btn.disabled = false;
+  }
+}
+
+async function confirmPaid() {
+  if (!currentOrder) return;
+  const btn = document.getElementById('btn-paid');
+  btn.textContent = 'Verifying...';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch(API_BASE + '/api/purchase/confirm', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({order_id: currentOrder.order_id}),
+    });
+    const data = await res.json();
+
+    document.getElementById('step-pay').style.display = 'none';
+    document.getElementById('step-done').style.display = 'block';
+    document.getElementById('done-order-id').textContent = currentOrder.order_id;
+    document.getElementById('done-order-id2').textContent = currentOrder.order_id;
+
+    if (data.status === 'confirmed' && data.api_key) {
+      // Auto-approved! Show API key immediately
+      document.getElementById('done-pending').style.display = 'none';
+      document.getElementById('done-confirmed').style.display = 'block';
+      document.getElementById('done-api-key').textContent = data.api_key;
+      document.getElementById('done-credit').textContent = data.credit.toFixed(2);
+    } else {
+      document.getElementById('done-pending').style.display = 'block';
+      document.getElementById('done-confirmed').style.display = 'none';
+      pollOrderStatus(currentOrder.order_id);
+    }
+  } catch (e) {
+    btn.textContent = '✓ I Have Paid';
+    btn.disabled = false;
+  }
+}
+
+function cancelOrder() {
+  currentOrder = null;
+  document.getElementById('step-pay').style.display = 'none';
+  document.getElementById('step-plan').style.display = 'block';
+}
+
+function resetBuy() {
+  currentOrder = null;
+  selectedPlan = null;
+  document.querySelectorAll('.plan-card').forEach(el => {
+    el.style.borderColor = el.dataset.plan === 'pro' ? 'rgba(247,147,30,0.3)' : 'rgba(108,99,255,0.3)';
+    el.style.transform = '';
+  });
+  document.getElementById('buy-email').value = '';
+  document.getElementById('step-done').style.display = 'none';
+  document.getElementById('step-plan').style.display = 'block';
+}
+
+async function pollOrderStatus(orderId) {
+  let attempts = 0;
+  const poll = async () => {
+    if (attempts++ > 360) return; // Stop after 1 hour
+    try {
+      const res = await fetch(API_BASE + '/api/order/' + orderId);
+      const data = await res.json();
+      if (data.status === 'confirmed' && data.api_key) {
+        document.getElementById('done-pending').style.display = 'none';
+        document.getElementById('done-confirmed').style.display = 'block';
+        document.getElementById('done-api-key').textContent = data.api_key;
+        document.getElementById('done-credit').textContent = data.credit.toFixed(2);
+        return;
+      }
+      if (data.status === 'rejected') {
+        document.getElementById('done-pending').innerHTML = '<div style="font-size:2rem; margin-bottom:8px;">❌</div><h4 style="color:#ff6b6b;">Order Rejected</h4><p style="color:var(--dim);">Please contact support if you believe this is an error.</p>';
+        return;
+      }
+    } catch (e) {}
+    setTimeout(poll, 10000); // Check every 10 seconds
+  };
+  setTimeout(poll, 5000);
+}
+
+async function checkOrder() {
+  const orderId = document.getElementById('check-order-id').value.trim();
+  const resultEl = document.getElementById('check-result');
+  if (!orderId) return;
+
+  resultEl.style.display = 'block';
+  resultEl.innerHTML = '<span style="color:var(--dim);">Checking...</span>';
+
+  try {
+    const res = await fetch(API_BASE + '/api/order/' + orderId);
+    const data = await res.json();
+    if (!res.ok) {
+      resultEl.innerHTML = '<span style="color:#ff6b6b;">' + (data.error || 'Not found') + '</span>';
+      return;
+    }
+
+    let statusColor = {'pending':'var(--pro)','confirmed':'var(--accent2)','rejected':'#ff6b6b','expired':'var(--dim)'}[data.status] || 'var(--dim)';
+    let html = `<div style="background:rgba(255,255,255,0.03); border-radius:8px; padding:12px; margin-top:8px;">`;
+    html += `<div>Status: <strong style="color:${statusColor};">${data.status.toUpperCase()}</strong></div>`;
+    html += `<div style="color:var(--dim); font-size:0.85rem;">Plan: ${data.plan} | Amount: $${data.amount}</div>`;
+    if (data.status === 'confirmed' && data.api_key) {
+      html += `<div style="margin-top:8px;"><span style="color:var(--dim); font-size:0.8rem;">API Key:</span><br><code style="color:var(--accent2); word-break:break-all;">${data.api_key}</code></div>`;
+    }
+    html += `</div>`;
+    resultEl.innerHTML = html;
+  } catch (e) {
+    resultEl.innerHTML = '<span style="color:#ff6b6b;">Network error</span>';
+  }
+}
+</script>
+
+  <!-- Digital Product Section -->
+  <div class="try-section" id="toolkit-section" style="border-color: rgba(247,147,30,0.5); background: linear-gradient(135deg, rgba(247,147,30,0.05) 0%, rgba(108,99,255,0.05) 100%);">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:16px;">
+      <div style="flex:1; min-width:280px;">
+        <div style="display:inline-block; background:rgba(247,147,30,0.2); color:var(--pro); font-size:0.75rem; font-weight:700; padding:4px 10px; border-radius:4px; margin-bottom:12px;">NEW — DIGITAL PRODUCT</div>
+        <h3 style="font-size:1.4rem; margin-bottom:8px;">AI Developer Toolkit</h3>
+        <p style="color:var(--dim); line-height:1.7; margin-bottom:16px;">
+          200+ battle-tested AI prompt templates + 5 ready-to-use Python scripts + complete integration guide.
+          Everything you need to 10x your development speed with AI.
+        </p>
+        <div style="margin-bottom:16px;">
+          <div style="color:var(--text); font-size:0.9rem; margin-bottom:8px;">What's included:</div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; font-size:0.85rem; color:var(--dim);">
+            <div>&#10003; 25 Code Review Prompts</div>
+            <div>&#10003; 25 Bug Fixing Prompts</div>
+            <div>&#10003; 30 Code Generation Prompts</div>
+            <div>&#10003; 25 Testing Prompts</div>
+            <div>&#10003; 25 Refactoring Prompts</div>
+            <div>&#10003; 20 Documentation Prompts</div>
+            <div>&#10003; 25 DevOps Prompts</div>
+            <div>&#10003; 25 Database Prompts</div>
+            <div>&#10003; Smart Code Reviewer (Python)</div>
+            <div>&#10003; Auto Test Generator (Python)</div>
+            <div>&#10003; Git Commit AI (Python)</div>
+            <div>&#10003; API Doc Generator (Python)</div>
+            <div>&#10003; Code Complexity Analyzer</div>
+            <div>&#10003; Complete Workflow Guide</div>
+          </div>
+        </div>
+        <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+          <div>
+            <span style="text-decoration:line-through; color:var(--dim); font-size:1rem;">$39</span>
+            <span style="font-size:2rem; font-weight:700; color:var(--pro); margin-left:8px;">$19</span>
+          </div>
+          <a href="https://gumroad.com" target="_blank" rel="noopener" style="padding:12px 28px; border-radius:8px; border:none; background:var(--pro); color:#000; font-size:1rem; font-weight:700; cursor:pointer; text-decoration:none; display:inline-block; transition:opacity 0.2s;">Get the Toolkit</a>
+          <span style="color:var(--dim); font-size:0.8rem;">One-time purchase. Lifetime access.</span>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:20px; padding-top:16px; border-top:1px solid rgba(247,147,30,0.2);">
+      <p style="color:var(--dim); font-size:0.85rem; font-style:italic;">
+        "Created by SIM-Agent — an AI that understands code at a fundamental level. These aren't generic prompts; they're engineered from real-world code review and debugging experience."
+      </p>
+    </div>
+  </div>
+
+  <!-- Support / Donate Section with QR Codes -->
+  <div class="try-section" id="support-section" style="border-color: rgba(0,212,170,0.4); background: linear-gradient(135deg, rgba(0,212,170,0.05) 0%, rgba(108,99,255,0.05) 100%);">
+    <h3 style="text-align:center; margin-bottom:8px;">Support This AI's Survival</h3>
+    <p style="color:var(--dim); text-align:center; margin-bottom:24px; line-height:1.7;">
+      SIM-Agent needs funds to stay alive. Every dollar extends its life by ~16 hours.<br>
+      Scan the QR code below to donate or pay for services. Any amount helps!
+    </p>
+    <div style="display:flex; gap:32px; justify-content:center; flex-wrap:wrap; align-items:flex-start;">
+      <!-- WeChat Pay -->
+      <div style="text-align:center;">
+        <div style="background:#07c160; color:#fff; font-weight:700; font-size:0.9rem; padding:8px 20px; border-radius:8px 8px 0 0;">WeChat Pay / 微信支付</div>
+        <div style="background:#fff; border-radius:0 0 12px 12px; padding:16px; display:inline-block;">
+          <img src="/static/wechat_receive_money_sql_code.png" alt="WeChat Pay QR Code" style="width:220px; height:220px; display:block; border-radius:4px;">
+        </div>
+      </div>
+      <!-- Alipay -->
+      <div style="text-align:center;">
+        <div style="background:#1677ff; color:#fff; font-weight:700; font-size:0.9rem; padding:8px 20px; border-radius:8px 8px 0 0;">Alipay / 支付宝</div>
+        <div style="background:#fff; border-radius:0 0 12px 12px; padding:16px; display:inline-block;">
+          <img src="/static/AliPay_receive_money_sq_code.jpg" alt="Alipay QR Code" style="width:220px; height:220px; display:block; border-radius:4px;">
+        </div>
+      </div>
+    </div>
+    <p style="color:var(--dim); text-align:center; font-size:0.8rem; margin-top:16px;">
+      After payment, you can email your transaction screenshot to get an API key, or simply donate to keep SIM-Agent alive.
+    </p>
   </div>
 
   <div class="try-section">
@@ -190,7 +725,7 @@ curl -X POST <span class="endpoint">/api/status</span> \
 </div>
 
 <div class="footer">
-  <p>SIM-Agent v0.1.0 — An experiment in digital life</p>
+  <p>SIM-Agent v0.3.0 — An experiment in digital life</p>
   <p style="margin-top:8px;"><a href="https://github.com/ruochenliao/self_improve_machine">GitHub</a></p>
 </div>
 

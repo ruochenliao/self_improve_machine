@@ -155,7 +155,50 @@ CREATE TABLE IF NOT EXISTS creator_payouts (
     status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'success', 'failed'))
 );
 
+-- API Keys: user authentication and credit system
+CREATE TABLE IF NOT EXISTS api_keys (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    api_key TEXT NOT NULL UNIQUE,
+    user_name TEXT NOT NULL DEFAULT '',
+    email TEXT NOT NULL DEFAULT '',
+    credit_balance REAL NOT NULL DEFAULT 0.0,
+    total_spent REAL NOT NULL DEFAULT 0.0,
+    total_requests INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    last_used_at TEXT,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    notes TEXT NOT NULL DEFAULT ''
+);
+
+-- API Key usage log: per-request deductions
+CREATE TABLE IF NOT EXISTS api_key_usage (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp TEXT NOT NULL DEFAULT (datetime('now')),
+    api_key TEXT NOT NULL,
+    service_name TEXT NOT NULL,
+    amount_charged REAL NOT NULL,
+    FOREIGN KEY (api_key) REFERENCES api_keys(api_key)
+);
+
+-- Purchase orders: self-service API key purchases
+CREATE TABLE IF NOT EXISTS purchase_orders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    order_id TEXT NOT NULL UNIQUE,
+    email TEXT NOT NULL DEFAULT '',
+    plan TEXT NOT NULL DEFAULT '',
+    amount REAL NOT NULL DEFAULT 0.0,
+    credit REAL NOT NULL DEFAULT 0.0,
+    payment_method TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'rejected', 'expired')),
+    api_key TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    confirmed_at TEXT,
+    notes TEXT NOT NULL DEFAULT ''
+);
+
 -- Indexes
+CREATE INDEX IF NOT EXISTS idx_purchase_orders_id ON purchase_orders(order_id);
+CREATE INDEX IF NOT EXISTS idx_purchase_orders_status ON purchase_orders(status);
 CREATE INDEX IF NOT EXISTS idx_ledger_timestamp ON ledger(timestamp);
 CREATE INDEX IF NOT EXISTS idx_ledger_type ON ledger(type);
 CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit(timestamp);
@@ -165,4 +208,6 @@ CREATE INDEX IF NOT EXISTS idx_lineage_parent ON lineage(parent_id);
 CREATE INDEX IF NOT EXISTS idx_lineage_child ON lineage(child_id);
 CREATE INDEX IF NOT EXISTS idx_lineage_instance ON lineage(instance_id);
 CREATE INDEX IF NOT EXISTS idx_digital_assets_id ON digital_assets(asset_id);
+CREATE INDEX IF NOT EXISTS idx_api_keys_key ON api_keys(api_key);
+CREATE INDEX IF NOT EXISTS idx_api_key_usage_key ON api_key_usage(api_key);
 """

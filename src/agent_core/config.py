@@ -97,6 +97,8 @@ class IncomeConfig(BaseModel):
     api_port: int = 8402
     api_host: str = "0.0.0.0"
     github_token: str = ""
+    alipay_qr_url: str = ""
+    wechat_qr_url: str = ""
 
 
 class SelfModConfig(BaseModel):

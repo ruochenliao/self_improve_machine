@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 import structlog
 
-from .prompts import IDENTITY_PROMPT, MEMORY_PROMPT, TOOL_CALLING_PROMPT, get_tier_prompt
+from .prompts import IDENTITY_PROMPT, MEMORY_PROMPT, TOOL_CALLING_PROMPT, get_tier_prompt, _get_tunnel_url
 
 if TYPE_CHECKING:
     from agent_core.identity.identity import IdentityManager
@@ -45,7 +45,8 @@ class ContextManager:
         burn_rate = self._balance_monitor.burn_rate
         ttl = self._balance_monitor.time_to_live_hours
 
-        # Identity
+        # Identity (inject dynamic tunnel URL)
+        identity_info["tunnel_url"] = _get_tunnel_url()
         prompt_parts = [
             IDENTITY_PROMPT.format(**identity_info),
         ]

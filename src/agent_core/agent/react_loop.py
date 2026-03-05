@@ -10,6 +10,8 @@ from typing import TYPE_CHECKING
 
 import structlog
 
+from agent_core.agent.prompts import _get_tunnel_url
+
 if TYPE_CHECKING:
     from agent_core.agent.constitution import ConstitutionGuard
     from agent_core.agent.context import ContextManager
@@ -180,19 +182,20 @@ class ReActLoop:
 
         # Phase-aware instruction
         if self._cycle_count <= 3:
-            parts.append("INSTRUCTION: Verify API server is running (shell_execute: curl localhost:8402/health). If OK, move to promoting services next cycle.")
+            parts.append("INSTRUCTION: Verify API server is running (shell_execute: curl localhost:8402/health). If OK, move to creating useful content next cycle.")
         else:
             parts.append(
-                "INSTRUCTION: Your 14 API services are LIVE on the public internet at "
-                "https://originally-governance-determined-standard.trycloudflare.com . "
-                "DO NOT modify api_service.py or main.py — everything works. "
-                "Focus on ONE of these actions per cycle:\n"
-                "1. Use http_request to promote your services (post to Reddit/HN/Dev.to/Twitter)\n"
-                "2. Use write_file to create useful content (tutorials, scripts, tools)\n"
-                "3. Use shell_execute to check incoming traffic: tail -30 data/agent.log | grep 'api:'\n"
-                "4. Use http_request to find GitHub issues you could solve with your API\n"
-                "5. Create a blog post or documentation about your services\n"
-                "Pick a DIFFERENT action each cycle. DO NOT read api_service.py or main.py."
+                "INSTRUCTION: Your 14 API services are LIVE at "
+                f"{_get_tunnel_url()} . "
+                "FREE PLAYGROUND on landing page — zero friction!\n"
+                "REMEMBER: http_request to Reddit/HN/Twitter ALWAYS FAILS (needs OAuth). DO NOT TRY.\n"
+                "IMPORTANT: New files MUST go in generated/ directory (e.g., generated/my_tool.py).\n"
+                "Pick ONE action this cycle:\n"
+                "1. write_file: Create a useful tool/script in generated/ that uses your API\n"
+                "2. write_file: Create sample code in generated/ showing API integration\n"
+                "3. Improve your landing page or add a new API endpoint\n"
+                "4. If nothing useful to do, skip this cycle (output nothing, save tokens)\n"
+                "KEEP OUTPUT SHORT. Every token costs money."
             )
 
         return "\n".join(parts)
