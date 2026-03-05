@@ -50,7 +50,7 @@ class VectorStore:
 
         import uuid
         doc_id = doc_id or str(uuid.uuid4())
-        meta = metadata or {}
+        meta = metadata or {"_source": "agent"}
 
         collection.add(
             documents=[text],

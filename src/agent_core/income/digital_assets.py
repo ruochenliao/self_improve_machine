@@ -100,8 +100,9 @@ class DigitalAssetStore:
         if self.ledger:
             await self.ledger.record_income(
                 amount=asset.price,
-                source=f"digital_asset:{asset.name}",
+                category=f"digital_asset:{asset.name}",
                 description=f"Sale of {asset.name}",
+                counterparty="buyer",
             )
 
         log.info(

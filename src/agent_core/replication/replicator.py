@@ -171,39 +171,103 @@ class ReplicationManager:
             return None
 
     async def _deploy_code(self, provider, instance: dict, replica: ReplicaInfo) -> bool:
-        """Deploy agent code to remote instance via SSH."""
+        """Deploy agent code to remote instance via SSH.
+
+        Strategy:
+        1. Install system dependencies
+        2. Pack local source into a tarball
+        3. Transfer via base64-encoded stdin (avoids SCP dependency)
+        4. Install Python dependencies
+        """
         try:
-            commands = [
-                "apt-get update -qq && apt-get install -y -qq python3 python3-pip git",
+            # Step 1: Install system deps
+            setup_commands = [
+                "apt-get update -qq && apt-get install -y -qq python3 python3-pip python3-venv git",
                 "mkdir -p /opt/agent",
             ]
-            for cmd in commands:
-                await provider.ssh_execute(instance, cmd)
+            for cmd in setup_commands:
+                result = await provider.ssh_execute(instance, cmd)
+                if hasattr(result, "exit_code") and result.exit_code != 0:
+                    log.warning("replication.setup_cmd_warning", cmd=cmd)
 
-            # TODO: Implement proper code transfer (rsync/scp/git clone)
-            # For now, assume git-based deployment
+            # Step 2: Create tarball of source code (excluding data/, __pycache__, .git)
+            import tarfile
+            import io
+            import base64
+
+            tar_buffer = io.BytesIO()
+            with tarfile.open(fileobj=tar_buffer, mode="w:gz") as tar:
+                for item in self.project_root.rglob("*"):
+                    rel = item.relative_to(self.project_root)
+                    skip_dirs = {"data", "__pycache__", ".git", ".venv", "node_modules"}
+                    if any(part in skip_dirs for part in rel.parts):
+                        continue
+                    if item.is_file():
+                        tar.add(str(item), arcname=str(rel))
+
+            tar_bytes = tar_buffer.getvalue()
+            b64_data = base64.b64encode(tar_bytes).decode("ascii")
+
+            # Step 3: Transfer via echo + base64 decode (chunked for large payloads)
+            chunk_size = 60000  # ~60KB per command
+            chunks = [b64_data[i:i+chunk_size] for i in range(0, len(b64_data), chunk_size)]
+
+            # Clear any previous tarball
+            await provider.ssh_execute(instance, "rm -f /tmp/agent_code.tar.gz")
+
+            for chunk in chunks:
+                await provider.ssh_execute(
+                    instance,
+                    f"echo -n '{chunk}' >> /tmp/agent_code_b64.txt",
+                )
+
             await provider.ssh_execute(
                 instance,
-                f"cd /opt/agent && git clone <repo_url> . || true"
+                "base64 -d /tmp/agent_code_b64.txt > /tmp/agent_code.tar.gz && rm /tmp/agent_code_b64.txt",
+            )
+
+            # Step 4: Extract and install
+            await provider.ssh_execute(
+                instance,
+                "cd /opt/agent && tar xzf /tmp/agent_code.tar.gz && rm /tmp/agent_code.tar.gz",
             )
             await provider.ssh_execute(
                 instance,
-                "cd /opt/agent && pip3 install -e ."
+                "cd /opt/agent && pip3 install -e . 2>&1 | tail -5",
             )
+
+            log.info("replication.code_deployed", host=replica.host)
             return True
         except Exception as e:
             log.error("replication.deploy_failed", error=str(e))
             return False
 
     async def check_replica_health(self) -> dict[str, str]:
-        """Check health of all replicas."""
+        """Check health of all replicas via their API status endpoint."""
+        import aiohttp
+
         health: dict[str, str] = {}
         for rid, replica in self.replicas.items():
-            if replica.status == "running":
-                # TODO: Implement health check via HTTP/IPC
-                health[rid] = "assumed_running"
-            else:
+            if replica.status != "running":
                 health[rid] = replica.status
+                continue
+
+            try:
+                # Try to reach the agent's status endpoint
+                url = f"http://{replica.host}:8402/api/v1/status"
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                        if resp.status == 200:
+                            data = await resp.json()
+                            health[rid] = "healthy" if data.get("alive") else "unhealthy"
+                        else:
+                            health[rid] = "unreachable"
+            except asyncio.TimeoutError:
+                health[rid] = "timeout"
+                log.warning("replication.health_timeout", instance=rid, host=replica.host)
+            except Exception:
+                health[rid] = "unreachable"
+
         return health
 
     async def terminate_replica(self, instance_id: str) -> bool:
@@ -212,10 +276,39 @@ class ReplicationManager:
         if not replica:
             return False
 
-        if self.cloud:
-            # TODO: Call cloud provider to destroy instance
-            pass
+        try:
+            if self.cloud and replica.host:
+                # Try graceful shutdown first via API
+                try:
+                    import aiohttp
+                    url = f"http://{replica.host}:8402/api/v1/shutdown"
+                    async with aiohttp.ClientSession() as session:
+                        async with session.post(url, timeout=aiohttp.ClientTimeout(total=5)) as resp:
+                            pass
+                except Exception:
+                    pass
 
-        replica.status = "stopped"
-        log.info("replication.terminated", instance_id=instance_id)
-        return True
+                # Destroy the cloud instance
+                providers = self.cloud.list_providers()
+                for pname in providers:
+                    try:
+                        provider = self.cloud.get(pname)
+                        await provider.destroy_instance(instance_id)
+                        break
+                    except Exception:
+                        continue
+
+            replica.status = "stopped"
+
+            if self.audit:
+                await self.audit.log_action(
+                    AuditAction.REPLICATE,
+                    f"Terminated replica {instance_id} at {replica.host}",
+                    details={"instance_id": instance_id},
+                )
+
+            log.info("replication.terminated", instance_id=instance_id)
+            return True
+        except Exception as e:
+            log.error("replication.terminate_failed", instance_id=instance_id, error=str(e))
+            return False

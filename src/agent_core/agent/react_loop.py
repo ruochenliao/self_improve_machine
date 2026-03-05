@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import time
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 import structlog
@@ -15,6 +16,7 @@ if TYPE_CHECKING:
     from agent_core.economy.ledger import Ledger
     from agent_core.llm.router import ModelRouter
     from agent_core.memory.experience import ExperienceManager
+    from agent_core.survival.balance_monitor import BalanceMonitor
     from agent_core.survival.state_machine import SurvivalStateMachine
     from agent_core.tools.registry import ToolRegistry
 
@@ -33,6 +35,7 @@ class ReActLoop:
         constitution: ConstitutionGuard,
         experience_manager: ExperienceManager,
         ledger: Ledger,
+        balance_monitor: "BalanceMonitor | None" = None,
     ) -> None:
         self._context = context_manager
         self._router = model_router
@@ -41,6 +44,7 @@ class ReActLoop:
         self._constitution = constitution
         self._experience = experience_manager
         self._ledger = ledger
+        self._balance_monitor = balance_monitor
         self._cycle_count = 0
         self._stop_event = asyncio.Event()
         self._current_tool_task: asyncio.Task | None = None
@@ -75,6 +79,10 @@ class ReActLoop:
         cycle_start = time.time()
 
         logger.info("react_loop.cycle_start", cycle=self._cycle_count, tier=tier)
+
+        # 0. BALANCE CHECK: Refresh balance before thinking
+        if self._balance_monitor:
+            await self._balance_monitor.check()
 
         # 1. OBSERVE: Build context
         observation = self._build_observation()
@@ -150,13 +158,29 @@ class ReActLoop:
     def _build_observation(self) -> str:
         """Build the observation string for the current cycle."""
         status = self._state_machine.get_status()
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
+        # Estimate remaining cycles at current burn rate
+        balance = status['balance_usd']
+        burn_rate = self._balance_monitor.burn_rate if self._balance_monitor else 0
+        ttl_hours = self._balance_monitor.time_to_live_hours if self._balance_monitor else float('inf')
+
         parts = [
-            f"Cycle #{self._cycle_count}",
-            f"Tier: {status['tier']}",
-            f"Balance: ${status['balance_usd']:.2f}",
-            f"Alive: {status['is_alive']}",
+            f"## Cycle #{self._cycle_count} | {now}",
+            f"Tier: {status['tier']} | Balance: ${balance:.4f} | Burn: ${burn_rate:.4f}/hr | TTL: {min(ttl_hours, 99999):.1f}h",
+            f"Loop interval: {status['loop_interval_sec']}s | Max tools/cycle: {status['max_tool_calls']}",
         ]
-        return " | ".join(parts)
+
+        # Add API service status if available
+        if hasattr(self, '_api_stats_fn') and self._api_stats_fn:
+            try:
+                stats = self._api_stats_fn()
+                parts.append(f"API: {stats.get('total_requests', 0)} requests, ${stats.get('total_revenue', 0):.4f} revenue")
+            except Exception:
+                pass
+
+        parts.append("What is the single most valuable action you can take right now?")
+        return "\n".join(parts)
 
     def request_stop(self) -> None:
         """Request the loop to stop gracefully."""

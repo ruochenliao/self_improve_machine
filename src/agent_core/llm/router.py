@@ -39,12 +39,16 @@ class ModelRouter:
         self._tier_preferences[tier] = model_keys
 
     def configure_from_config(self, config: AgentConfig) -> None:
-        """Build tier preferences from config model lists."""
-        provider_map: dict[str, str] = {}
-        for model in config.llm.openai.models:
-            provider_map[model] = "openai"
-        for model in config.llm.anthropic.models:
-            provider_map[model] = "anthropic"
+        """Build tier preferences from config model lists.
+
+        All models registered through OpenAI-compatible providers (including
+        CloseAI proxy for Claude/DeepSeek/Gemini) use 'openai' as provider name.
+        """
+        # Build a map of model_name -> provider_name from registered providers
+        registered: dict[str, str] = {}
+        for key in self._providers:
+            provider_name, model_name = key.split(":", 1)
+            registered[model_name] = provider_name
 
         for tier_name, model_list in [
             ("normal", config.survival.models.normal),
@@ -53,8 +57,12 @@ class ModelRouter:
         ]:
             keys = []
             for model in model_list:
-                provider = provider_map.get(model, "openai")
-                keys.append(f"{provider}:{model}")
+                provider = registered.get(model)
+                if provider:
+                    keys.append(f"{provider}:{model}")
+                else:
+                    # Assume openai-compatible (CloseAI proxy)
+                    keys.append(f"openai:{model}")
             self._tier_preferences[tier_name] = keys
 
     async def chat(

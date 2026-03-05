@@ -164,20 +164,121 @@ class GitHubBountyPlatform(FreelancePlatform):
 
     async def apply_for_task(self, task_id: str, proposal: str) -> bool:
         """Comment on the issue to express interest."""
-        # TODO: Implement GitHub issue comment
-        log.info("github_bounty.applied", task_id=task_id)
-        return True
+        if not self.http or not self.token:
+            log.warning("github_bounty.apply_no_credentials")
+            return False
+
+        try:
+            # Find the issue URL from metadata (stored when searching)
+            # task_id is the issue numeric ID; we need the repo + issue number
+            # Search for the issue to get its comments URL
+            headers = {
+                "Accept": "application/vnd.github.v3+json",
+                "Authorization": f"token {self.token}",
+            }
+            # Use search to find the issue by ID
+            url = f"{self._base_url}/search/issues?q={task_id}"
+            resp = await self.http.get(url, headers=headers)
+
+            if resp and resp.get("items"):
+                item = resp["items"][0]
+                comments_url = item.get("comments_url", "")
+                if comments_url:
+                    await self.http.post(
+                        comments_url,
+                        headers=headers,
+                        json={"body": proposal},
+                    )
+                    log.info("github_bounty.applied", task_id=task_id)
+                    return True
+            return False
+        except Exception as e:
+            log.error("github_bounty.apply_failed", task_id=task_id, error=str(e))
+            return False
 
     async def submit_work(self, task_id: str, deliverables: dict[str, Any]) -> bool:
-        """Submit a pull request with the solution."""
-        # TODO: Implement PR creation
-        log.info("github_bounty.submitted", task_id=task_id)
-        return True
+        """Submit a pull request with the solution.
+
+        deliverables should contain:
+        - repo: "owner/repo" string
+        - branch: branch name with the fix
+        - title: PR title
+        - body: PR description
+        """
+        if not self.http or not self.token:
+            log.warning("github_bounty.submit_no_credentials")
+            return False
+
+        try:
+            repo = deliverables.get("repo", "")
+            if not repo:
+                log.error("github_bounty.submit_no_repo")
+                return False
+
+            headers = {
+                "Accept": "application/vnd.github.v3+json",
+                "Authorization": f"token {self.token}",
+            }
+            pr_url = f"{self._base_url}/repos/{repo}/pulls"
+            pr_data = {
+                "title": deliverables.get("title", f"Fix for #{task_id}"),
+                "body": deliverables.get("body", f"Automated fix for issue #{task_id}"),
+                "head": deliverables.get("branch", "fix-branch"),
+                "base": deliverables.get("base", "main"),
+            }
+            resp = await self.http.post(pr_url, headers=headers, json=pr_data)
+
+            if resp and resp.get("number"):
+                log.info(
+                    "github_bounty.pr_created",
+                    task_id=task_id,
+                    pr_number=resp["number"],
+                )
+                return True
+            return False
+        except Exception as e:
+            log.error("github_bounty.submit_failed", task_id=task_id, error=str(e))
+            return False
 
     async def check_payment(self, task_id: str) -> Optional[float]:
-        """Check if bounty has been paid."""
-        # TODO: Implement payment verification
-        return None
+        """Check if bounty has been paid by looking for payment confirmation in comments."""
+        if not self.http:
+            return None
+
+        try:
+            headers = {"Accept": "application/vnd.github.v3+json"}
+            if self.token:
+                headers["Authorization"] = f"token {self.token}"
+
+            url = f"{self._base_url}/search/issues?q={task_id}"
+            resp = await self.http.get(url, headers=headers)
+
+            if resp and resp.get("items"):
+                item = resp["items"][0]
+                # Check if issue is closed (often means bounty resolved)
+                if item.get("state") == "closed":
+                    reward = self._extract_reward(item)
+                    if reward > 0:
+                        log.info("github_bounty.payment_detected", task_id=task_id, reward=reward)
+                        return reward
+
+                # Check comments for payment confirmation
+                comments_url = item.get("comments_url", "")
+                if comments_url:
+                    comments = await self.http.get(comments_url, headers=headers)
+                    if isinstance(comments, list):
+                        import re
+                        for comment in comments:
+                            body = comment.get("body", "").lower()
+                            if any(kw in body for kw in ["paid", "payment sent", "bounty paid", "reward sent"]):
+                                match = re.search(r"\$(\d+(?:\.\d+)?)", comment.get("body", ""))
+                                if match:
+                                    return float(match.group(1))
+                                return self._extract_reward(item)
+            return None
+        except Exception as e:
+            log.error("github_bounty.check_payment_error", task_id=task_id, error=str(e))
+            return None
 
 
 class FreelanceManager:

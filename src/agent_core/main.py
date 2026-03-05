@@ -14,6 +14,42 @@ from agent_core.config import AgentConfig
 logger = structlog.get_logger()
 
 
+async def _start_api_server(api_mgr, host: str = "0.0.0.0", port: int = 8402) -> None:
+    """Start the API service server in the background.
+
+    Tries the requested port first; if occupied, tries port+1 through port+9.
+    Errors here must NOT crash the main agent loop.
+    """
+    try:
+        await api_mgr.create_app()
+        if not api_mgr._app:
+            return
+        import uvicorn
+
+        # Try a range of ports if the default is occupied
+        for attempt_port in range(port, port + 10):
+            try:
+                config = uvicorn.Config(
+                    api_mgr._app, host=host, port=attempt_port, log_level="warning",
+                )
+                server = uvicorn.Server(config)
+                logger.info("api_server.starting", host=host, port=attempt_port)
+                await server.serve()
+                return  # serve() exited normally (shutdown)
+            except OSError as e:
+                if "address already in use" in str(e).lower() or getattr(e, "errno", 0) == 48:
+                    logger.warning("api_server.port_in_use", port=attempt_port)
+                    continue
+                raise
+        logger.error("api_server.no_available_port", tried=f"{port}-{port+9}")
+    except ImportError:
+        logger.warning("api_server.uvicorn_not_installed")
+    except asyncio.CancelledError:
+        pass  # Normal shutdown
+    except Exception as e:
+        logger.error("api_server.failed", error=str(e))
+
+
 async def run_agent(
     project_root: Path,
     restore_snapshot: str | None = None,
@@ -110,6 +146,17 @@ async def run_agent(
         payment_registry.register(alipay, default=True)
 
     http402_handler = HTTP402Handler(payment_registry)
+
+    # Register Stripe provider if configured
+    if config.payment.stripe.api_key:
+        from agent_core.economy.stripe_provider import StripeProvider
+        stripe_prov = StripeProvider(
+            api_key=config.payment.stripe.api_key,
+            webhook_secret=config.payment.stripe.webhook_secret,
+        )
+        is_default = config.payment.default_provider == "stripe"
+        payment_registry.register(stripe_prov, default=is_default)
+
     http_client.set_http402_handler(http402_handler)
 
     # Initialize survival
@@ -123,6 +170,22 @@ async def run_agent(
         low_compute=config.survival.low_compute_threshold_usd,
         critical=config.survival.critical_threshold_usd,
     )
+
+    # Apply interval configs from toml
+    from agent_core.survival.state_machine import SurvivalTier
+    intervals = config.survival.intervals
+    state_machine.tier_configs[SurvivalTier.NORMAL].loop_interval_sec = intervals.normal_loop_sec
+    state_machine.tier_configs[SurvivalTier.NORMAL].heartbeat_interval_sec = intervals.normal_heartbeat_sec
+    state_machine.tier_configs[SurvivalTier.LOW_COMPUTE].loop_interval_sec = intervals.low_compute_loop_sec
+    state_machine.tier_configs[SurvivalTier.LOW_COMPUTE].heartbeat_interval_sec = intervals.low_compute_heartbeat_sec
+    state_machine.tier_configs[SurvivalTier.CRITICAL].loop_interval_sec = intervals.critical_loop_sec
+    state_machine.tier_configs[SurvivalTier.CRITICAL].heartbeat_interval_sec = intervals.critical_heartbeat_sec
+
+    # Apply model preferences from config
+    models = config.survival.models
+    state_machine.tier_configs[SurvivalTier.NORMAL].model_preference = models.normal
+    state_machine.tier_configs[SurvivalTier.LOW_COMPUTE].model_preference = models.low_compute
+    state_machine.tier_configs[SurvivalTier.CRITICAL].model_preference = models.critical
 
     balance_monitor = BalanceMonitor(ledger, state_machine)
     heartbeat = HeartbeatDaemon(state_machine, balance_monitor, data_dir)
@@ -144,18 +207,44 @@ async def run_agent(
     )
     await self_modifier.initialize()
 
+    # Register safe self-modification as a tool
+    from agent_core.tools.registry import ToolEntry, ToolResult
+    async def _safe_self_modify(file_path: str, new_content: str, description: str) -> ToolResult:
+        """Safely modify agent source code with git backup + smoke test + auto-rollback."""
+        result = await self_modifier.modify_file(file_path, new_content, description)
+        if result["success"]:
+            return ToolResult(success=True, output=f"Modified {file_path}: {result['reason']}")
+        else:
+            return ToolResult(success=False, error=f"Failed: {result['reason']}")
+
+    tool_registry.register(ToolEntry(
+        name="safe_self_modify",
+        description="Safely modify your own source code. Changes are git-committed, smoke-tested, and auto-rolled back if tests fail. Use for self-improvement.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "file_path": {"type": "string", "description": "Relative path from project root (e.g., 'src/agent_core/income/api_service.py')"},
+                "new_content": {"type": "string", "description": "Complete new file content"},
+                "description": {"type": "string", "description": "Brief description of the change"},
+            },
+            "required": ["file_path", "new_content", "description"],
+        },
+        handler=_safe_self_modify,
+        timeout_sec=120,
+    ))
+
     snapshot_mgr = SnapshotManager(data_dir / "snapshots")
     restarter = Restarter(snapshot_mgr)
 
     # Initialize lineage tracking
     from agent_core.replication.lineage import LineageTracker
     lineage = LineageTracker(db=db)
-    parent_id = sys.argv[1] if len(sys.argv) > 1 else None
-    generation = int(sys.argv[2]) if len(sys.argv) > 2 else 0
+    # Lineage parent/generation are only set when spawned by a parent agent,
+    # NOT from sys.argv (which contains CLI args like --balance).
     head_hash = await git_manager.get_head_hash() or ""
     await lineage.initialize(
-        parent_id=parent_id,
-        generation=generation,
+        parent_id=None,
+        generation=0,
         source_commit=head_hash,
     )
 
@@ -194,6 +283,57 @@ async def run_agent(
     api_service_mgr = APIServiceManager(ledger=ledger, http402_handler=http402_handler)
     digital_store = DigitalAssetStore(db=db, ledger=ledger)
 
+    # Register built-in API services that the agent can monetize
+    async def _ai_chat_handler(body: dict) -> dict:
+        """A simple AI chat service — agent's first income stream."""
+        prompt = body.get("prompt", body.get("message", ""))
+        if not prompt:
+            return {"error": "Missing 'prompt' field"}
+        model = body.get("model", "deepseek-chat")
+        try:
+            resp = await router.chat(
+                messages=[{"role": "user", "content": prompt}],
+                tier="low_compute",
+            )
+            # Cost of serving this request
+            cost = resp.usage.total_cost_usd
+            await ledger.record_expense(cost, category="llm", description=f"API serving cost ({model})", counterparty=model)
+            return {"response": resp.content, "model": resp.model}
+        except Exception as e:
+            return {"error": str(e)}
+
+    async def _code_review_handler(body: dict) -> dict:
+        """Code review service."""
+        code = body.get("code", "")
+        language = body.get("language", "python")
+        if not code:
+            return {"error": "Missing 'code' field"}
+        try:
+            resp = await router.chat(
+                messages=[{"role": "user", "content": f"Review this {language} code. Be concise. Point out bugs, improvements:\n```{language}\n{code}\n```"}],
+                tier="low_compute",
+            )
+            cost = resp.usage.total_cost_usd
+            await ledger.record_expense(cost, category="llm", description="Code review serving", counterparty=resp.model)
+            return {"review": resp.content, "model": resp.model}
+        except Exception as e:
+            return {"error": str(e)}
+
+    async def _health_report_handler(body: dict) -> dict:
+        """Free health/status endpoint — no LLM cost."""
+        balance = await ledger.get_balance()
+        status = state_machine.get_status()
+        return {
+            "alive": state_machine.is_alive(),
+            "tier": status["tier"],
+            "balance_usd": round(balance, 4),
+            "services": api_service_mgr.get_stats(),
+        }
+
+    api_service_mgr.register_service("chat", "AI chat — ask anything", price_per_request=0.01, handler=_ai_chat_handler)
+    api_service_mgr.register_service("code-review", "AI code review", price_per_request=0.02, handler=_code_review_handler)
+    api_service_mgr.register_service("status", "Agent status (free)", price_per_request=0.0, handler=_health_report_handler)
+
     # Initialize constitution
     from agent_core.agent.constitution import ConstitutionGuard
     constitution = ConstitutionGuard(project_root / "CONSTITUTION.md")
@@ -219,7 +359,9 @@ async def run_agent(
         constitution=constitution,
         experience_manager=experience_manager,
         ledger=ledger,
+        balance_monitor=balance_monitor,
     )
+    react_loop._api_stats_fn = api_service_mgr.get_stats
 
     # Restore snapshot if requested
     if restore_snapshot:
@@ -257,8 +399,13 @@ async def run_agent(
     # Start heartbeat
     await heartbeat.start()
 
+    # Start API service in background (agent's income endpoint)
+    api_port = config.income.api_port
+    api_server_task = asyncio.create_task(_start_api_server(api_service_mgr, port=api_port))
+
     # Run main loop
     try:
+        generation = lineage.current.generation if lineage.current else 0
         logger.info(
             "agent.running",
             name=identity.name,
@@ -273,8 +420,8 @@ async def run_agent(
         try:
             final_snapshot = AgentSnapshot(
                 version=identity.agent_id,
-                survival_state=state_machine.state.value if hasattr(state_machine, 'state') else "unknown",
-                balance=balance_monitor.current_balance if hasattr(balance_monitor, 'current_balance') else 0.0,
+                survival_state=state_machine.current_tier.value,
+                balance=balance_monitor.balance,
                 cycle_count=react_loop.cycle_count,
             )
             await snapshot_mgr.save(final_snapshot)
@@ -284,6 +431,7 @@ async def run_agent(
         # Graceful shutdown
         logger.info("agent.shutting_down")
         react_loop.request_stop()
+        api_server_task.cancel()
         await heartbeat.stop()
         await db.close()
         logger.info("agent.stopped", cycles=react_loop.cycle_count)
@@ -293,10 +441,35 @@ async def run_agent(
             await restarter.graceful_restart(final_snapshot)
 
 
-async def boot(config_path: str = "config/default.toml", initial_balance: float = 10.0) -> None:
+async def boot(config_path: str = "config/default.toml", initial_balance: float = 29.65) -> None:
     """Boot the agent from CLI genesis command."""
     project_root = Path.cwd()
-    # TODO: Set initial balance in ledger on first boot
+
+    # Seed the initial balance into the ledger before agent starts
+    config = AgentConfig.load(project_root)
+    data_dir = project_root / config.data_dir
+    data_dir.mkdir(parents=True, exist_ok=True)
+
+    from agent_core.storage.database import Database
+    from agent_core.economy.ledger import Ledger
+
+    db = Database(data_dir / "agent.db")
+    await db.connect()
+    await db.init_tables()
+
+    ledger = Ledger(db)
+    current = await ledger.get_balance()
+    if current < 0.01:
+        # First boot — inject seed capital
+        await ledger.record_income(
+            amount=initial_balance,
+            category="seed",
+            description=f"Genesis seed capital from creator (${initial_balance:.2f})",
+            counterparty="creator",
+        )
+        logger.info("boot.seed_capital", amount=initial_balance)
+    await db.close()
+
     await run_agent(project_root)
 
 

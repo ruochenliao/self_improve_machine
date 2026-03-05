@@ -23,7 +23,7 @@ def cli(ctx, config: str):
 
 
 @cli.command()
-@click.option("--balance", default=10.0, type=float, help="Initial balance (USD)")
+@click.option("--balance", default=29.65, type=float, help="Initial balance (USD)")
 @click.pass_context
 def genesis(ctx, balance: float):
     """Create and start the agent (first birth)."""
@@ -85,8 +85,35 @@ def status():
 def fund(amount: float):
     """Add funds to the agent's balance."""
     click.echo(f"=== Funding Agent: +${amount:.2f} ===")
-    # TODO: Interact with running agent via IPC or database
-    click.echo("(Not yet implemented — will connect to running agent)")
+    db_path = Path("data/agent.db")
+    if not db_path.exists():
+        click.echo("ERROR: No database found. Run 'genesis' first.", err=True)
+        sys.exit(1)
+
+    async def _fund():
+        import aiosqlite
+        conn = await aiosqlite.connect(str(db_path))
+        conn.row_factory = aiosqlite.Row
+        await conn.execute(
+            """INSERT INTO ledger (amount, type, category, description, counterparty)
+               VALUES (?, 'income', 'funding', ?, 'creator')""",
+            (amount, f"Creator manual funding +${amount:.2f}"),
+        )
+        await conn.commit()
+        row = await conn.execute(
+            """SELECT
+                COALESCE(SUM(CASE WHEN type='income' THEN amount ELSE 0 END), 0) -
+                COALESCE(SUM(CASE WHEN type='expense' THEN amount ELSE 0 END), 0)
+                AS balance FROM ledger"""
+        )
+        result = await row.fetchone()
+        balance = float(result["balance"]) if result else 0.0
+        await conn.close()
+        return balance
+
+    balance = asyncio.run(_fund())
+    click.echo(f"✓ Funded ${amount:.2f}")
+    click.echo(f"  New balance: ${balance:.2f}")
 
 
 @cli.command()
@@ -101,21 +128,32 @@ def ledger():
     try:
         import sqlite3
         conn = sqlite3.connect(str(db_path))
+        conn.row_factory = sqlite3.Row
         cursor = conn.execute(
-            "SELECT timestamp, type, amount, source, description "
-            "FROM ledger ORDER BY timestamp DESC LIMIT 20"
+            "SELECT timestamp, type, amount, category, description "
+            "FROM ledger ORDER BY id DESC LIMIT 20"
         )
         rows = cursor.fetchall()
         if not rows:
             click.echo("No transactions.")
             return
 
-        click.echo(f"{'Time':<20} {'Type':<10} {'Amount':>10} {'Source':<20} {'Description'}")
+        click.echo(f"{'Time':<20} {'Type':<10} {'Amount':>10} {'Category':<15} {'Description'}")
         click.echo("-" * 80)
         for row in rows:
-            import datetime
-            ts = datetime.datetime.fromtimestamp(row[0]).strftime("%Y-%m-%d %H:%M")
-            click.echo(f"{ts:<20} {row[1]:<10} ${row[2]:>9.2f} {row[3]:<20} {row[4]}")
+            ts = str(row["timestamp"])[:16]
+            click.echo(f"{ts:<20} {row['type']:<10} ${row['amount']:>9.2f} {row['category']:<15} {row['description'][:30]}")
+
+        # Show balance
+        balance_row = conn.execute(
+            """SELECT
+                COALESCE(SUM(CASE WHEN type='income' THEN amount ELSE 0 END), 0) -
+                COALESCE(SUM(CASE WHEN type='expense' THEN amount ELSE 0 END), 0)
+                AS balance FROM ledger"""
+        ).fetchone()
+        balance = float(balance_row["balance"]) if balance_row else 0.0
+        click.echo("-" * 80)
+        click.echo(f"{'Current Balance:':<42} ${balance:>9.2f}")
 
         conn.close()
     except Exception as e:

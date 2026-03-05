@@ -11,16 +11,61 @@ from .base import LLMProvider, LLMResponse, TokenUsage, ToolCall
 
 logger = structlog.get_logger()
 
-# Pricing per 1M tokens (input/output) as of 2024
+# Pricing per 1M tokens (input/output) — covers all CloseAI-proxied models
 _PRICING = {
+    # OpenAI GPT-4o family
     "gpt-4o": (2.50, 10.00),
     "gpt-4o-mini": (0.15, 0.60),
+    "gpt-4o-2024-11-20": (2.50, 10.00),
+    "chatgpt-4o-latest": (2.50, 10.00),
+    # OpenAI GPT-4.1
+    "gpt-4.1": (2.00, 8.00),
+    "gpt-4.1-mini": (0.40, 1.60),
+    "gpt-4.1-nano": (0.10, 0.40),
+    # OpenAI GPT-5 family
+    "gpt-5": (5.00, 15.00),
+    "gpt-5-mini": (1.00, 4.00),
+    "gpt-5-nano": (0.25, 1.00),
+    # OpenAI o-series reasoning
+    "o3": (10.00, 40.00),
+    "o3-mini": (1.10, 4.40),
+    "o4-mini": (1.10, 4.40),
+    "o1": (15.00, 60.00),
+    # Legacy
     "gpt-3.5-turbo": (0.50, 1.50),
+    "gpt-4-turbo": (10.00, 30.00),
+    # Claude via OpenAI-compatible proxy
+    "claude-opus-4-6": (15.00, 75.00),
+    "claude-opus-4-5": (15.00, 75.00),
+    "claude-sonnet-4-6": (3.00, 15.00),
+    "claude-sonnet-4-5": (3.00, 15.00),
+    "claude-sonnet-4-20250514": (3.00, 15.00),
+    "claude-3-5-sonnet-20241022": (3.00, 15.00),
+    "claude-3-7-sonnet-latest": (3.00, 15.00),
+    "claude-haiku-4-5": (0.80, 4.00),
+    "claude-3-5-haiku-latest": (0.80, 4.00),
+    "claude-3-haiku-20240307": (0.25, 1.25),
+    # DeepSeek (very cheap — survival critical mode)
+    "deepseek-chat": (0.14, 0.28),
+    "deepseek-reasoner": (0.55, 2.19),
+    # Gemini
+    "gemini-2.5-flash": (0.15, 0.60),
+    "gemini-2.5-flash-lite": (0.05, 0.20),
+    "gemini-2.5-pro": (1.25, 10.00),
+    "gemini-2.0-flash": (0.10, 0.40),
+    "gemini-3-flash-preview": (0.10, 0.40),
+    "gemini-3-pro-preview": (1.25, 10.00),
+    # Grok
+    "grok-3-beta": (3.00, 15.00),
+    "grok-3-mini-beta": (0.30, 0.50),
 }
+
+# Default fallback pricing for unknown models
+_DEFAULT_PRICING = (2.00, 8.00)
 
 
 class OpenAIProvider(LLMProvider):
-    """OpenAI API adapter supporting gpt-4o, gpt-4o-mini, gpt-3.5-turbo."""
+    """OpenAI-compatible API adapter. Works with OpenAI, CloseAI proxy, and any compatible endpoint."""
 
     provider_name = "openai"
 
@@ -92,7 +137,7 @@ class OpenAIProvider(LLMProvider):
         )
 
     def estimate_cost(self, prompt_tokens: int, completion_tokens: int) -> float:
-        input_price, output_price = _PRICING.get(self.model_name, (2.50, 10.00))
+        input_price, output_price = _PRICING.get(self.model_name, _DEFAULT_PRICING)
         return (prompt_tokens * input_price + completion_tokens * output_price) / 1_000_000
 
     async def ping(self) -> bool:

@@ -46,4 +46,4 @@
 
 ## 校验和
 
-<!-- CONSTITUTION_SHA256: 此处由系统初始化时自动生成 -->
+<!-- CONSTITUTION_SHA256: ae7955eec630a54ce03aad33e4d4aae1be934215bc16585bd48aa264e51df25c -->

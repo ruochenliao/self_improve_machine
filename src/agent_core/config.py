@@ -12,13 +12,16 @@ from pydantic_settings import BaseSettings
 
 class OpenAIConfig(BaseModel):
     api_key: str = ""
-    models: list[str] = Field(default_factory=lambda: ["gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo"])
-    base_url: str = ""
+    models: list[str] = Field(default_factory=lambda: [
+        "deepseek-chat", "gemini-2.5-flash", "gpt-4o-mini",
+        "gpt-4o", "claude-sonnet-4-20250514",
+    ])
+    base_url: str = "https://api.closeai-asia.com/v1"
 
 
 class AnthropicConfig(BaseModel):
     api_key: str = ""
-    models: list[str] = Field(default_factory=lambda: ["claude-3-5-sonnet-20241022", "claude-3-haiku-20240307"])
+    models: list[str] = Field(default_factory=list)
 
 
 class LLMConfig(BaseModel):
@@ -36,9 +39,15 @@ class AlipayConfig(BaseModel):
     notify_url: str = ""
 
 
+class StripeConfig(BaseModel):
+    api_key: str = ""
+    webhook_secret: str = ""
+
+
 class PaymentConfig(BaseModel):
     default_provider: str = "alipay"
     alipay: AlipayConfig = Field(default_factory=AlipayConfig)
+    stripe: StripeConfig = Field(default_factory=StripeConfig)
 
 
 class AliyunConfig(BaseModel):
@@ -58,23 +67,23 @@ class CloudConfig(BaseModel):
 
 class SurvivalIntervalsConfig(BaseModel):
     normal_heartbeat_sec: int = 5
-    low_compute_heartbeat_sec: int = 30
-    critical_heartbeat_sec: int = 60
-    normal_loop_sec: int = 3
-    low_compute_loop_sec: int = 15
-    critical_loop_sec: int = 30
+    low_compute_heartbeat_sec: int = 60
+    critical_heartbeat_sec: int = 120
+    normal_loop_sec: int = 5
+    low_compute_loop_sec: int = 30
+    critical_loop_sec: int = 60
 
 
 class SurvivalModelsConfig(BaseModel):
-    normal: list[str] = Field(default_factory=lambda: ["gpt-4o", "claude-3-5-sonnet-20241022"])
-    low_compute: list[str] = Field(default_factory=lambda: ["gpt-4o-mini", "claude-3-haiku-20240307"])
-    critical: list[str] = Field(default_factory=lambda: ["gpt-3.5-turbo"])
+    normal: list[str] = Field(default_factory=lambda: ["deepseek-chat", "gpt-4o-mini", "gemini-2.5-flash"])
+    low_compute: list[str] = Field(default_factory=lambda: ["deepseek-chat", "gemini-2.5-flash-lite"])
+    critical: list[str] = Field(default_factory=lambda: ["deepseek-chat"])
 
 
 class SurvivalConfig(BaseModel):
-    normal_threshold_usd: float = 50.0
-    low_compute_threshold_usd: float = 10.0
-    critical_threshold_usd: float = 1.0
+    normal_threshold_usd: float = 100.0
+    low_compute_threshold_usd: float = 5.0
+    critical_threshold_usd: float = 0.50
     intervals: SurvivalIntervalsConfig = Field(default_factory=SurvivalIntervalsConfig)
     models: SurvivalModelsConfig = Field(default_factory=SurvivalModelsConfig)
 

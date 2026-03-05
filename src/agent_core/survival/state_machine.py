@@ -32,27 +32,27 @@ class TierConfig:
 DEFAULT_TIER_CONFIGS: dict[SurvivalTier, TierConfig] = {
     SurvivalTier.NORMAL: TierConfig(
         tier=SurvivalTier.NORMAL,
-        balance_threshold_usd=50.0,
-        model_preference=["gpt-4o", "claude-3-5-sonnet-20241022"],
+        balance_threshold_usd=100.0,
+        model_preference=["deepseek-chat", "gpt-4o-mini", "gemini-2.5-flash"],
         heartbeat_interval_sec=5,
         max_tool_calls_per_cycle=10,
-        loop_interval_sec=3,
+        loop_interval_sec=5,
     ),
     SurvivalTier.LOW_COMPUTE: TierConfig(
         tier=SurvivalTier.LOW_COMPUTE,
-        balance_threshold_usd=10.0,
-        model_preference=["gpt-4o-mini", "claude-3-haiku-20240307"],
-        heartbeat_interval_sec=30,
+        balance_threshold_usd=5.0,
+        model_preference=["deepseek-chat", "gemini-2.5-flash-lite"],
+        heartbeat_interval_sec=60,
         max_tool_calls_per_cycle=5,
-        loop_interval_sec=15,
+        loop_interval_sec=30,
     ),
     SurvivalTier.CRITICAL: TierConfig(
         tier=SurvivalTier.CRITICAL,
-        balance_threshold_usd=1.0,
-        model_preference=["gpt-3.5-turbo"],
-        heartbeat_interval_sec=60,
+        balance_threshold_usd=0.50,
+        model_preference=["deepseek-chat"],
+        heartbeat_interval_sec=120,
         max_tool_calls_per_cycle=3,
-        loop_interval_sec=30,
+        loop_interval_sec=60,
     ),
     SurvivalTier.DEAD: TierConfig(
         tier=SurvivalTier.DEAD,
@@ -122,7 +122,8 @@ class SurvivalStateMachine:
             return SurvivalTier.NORMAL
         elif balance >= low_threshold:
             return SurvivalTier.LOW_COMPUTE
-        elif balance >= critical_threshold:
+        elif balance > 0:
+            # As long as balance > 0, stay in CRITICAL — never give up
             return SurvivalTier.CRITICAL
         else:
             return SurvivalTier.DEAD

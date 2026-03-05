@@ -7,6 +7,9 @@ from typing import Any, Optional
 
 import structlog
 
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+
 log = structlog.get_logger()
 
 
@@ -46,13 +49,6 @@ class APIServiceManager:
 
     async def create_app(self):
         """Create the FastAPI application with all registered services."""
-        try:
-            from fastapi import FastAPI, Request, HTTPException
-            from fastapi.responses import JSONResponse
-        except ImportError:
-            log.error("api_service.fastapi_not_installed")
-            return None
-
         app = FastAPI(
             title="Self-Improve Agent API",
             description="Paid API services provided by an autonomous agent",
@@ -84,27 +80,11 @@ class APIServiceManager:
         log.info("api_service.app_created", services=len(self.services))
         return app
 
-    def _register_endpoint(self, app, name: str, config: "ServiceConfig") -> None:
-        """Register a single paid endpoint."""
-        from fastapi import Request
-        from fastapi.responses import JSONResponse
+    def _create_handler(self, name: str, config: "ServiceConfig"):
+        """Create a handler function for a service, properly capturing name/config."""
+        ledger = self.ledger
 
-        @app.post(f"/api/{name}")
-        async def endpoint(request: Request):
-            # Check payment
-            if self.http402:
-                paid = await self.http402.check_payment(request)
-                if not paid:
-                    return JSONResponse(
-                        status_code=402,
-                        content={
-                            "error": "Payment Required",
-                            "price": config.price_per_request,
-                            "payment_info": "Include payment token in X-Payment-Token header",
-                        },
-                    )
-
-            # Execute service
+        async def handler(request: Request):
             try:
                 body = await request.json()
                 if config.handler:
@@ -112,25 +92,28 @@ class APIServiceManager:
                 else:
                     result = {"error": "Service not yet implemented"}
 
-                # Record revenue
-                if self.ledger:
-                    await self.ledger.record_income(
+                if ledger and config.price_per_request > 0:
+                    await ledger.record_income(
                         amount=config.price_per_request,
-                        source=f"api:{name}",
+                        category=f"api:{name}",
                         description=f"API call to {name}",
+                        counterparty="api_client",
                     )
 
                 config.total_requests += 1
                 config.total_revenue += config.price_per_request
-
                 return {"result": result, "service": name}
-
             except Exception as e:
                 log.error("api_service.handler_error", service=name, error=str(e))
-                return JSONResponse(
-                    status_code=500,
-                    content={"error": "Internal service error"},
-                )
+                return JSONResponse(status_code=500, content={"error": "Internal service error"})
+
+        handler.__name__ = f"api_{name.replace('-', '_')}"
+        return handler
+
+    def _register_endpoint(self, app, name: str, config: "ServiceConfig") -> None:
+        """Register a single paid endpoint."""
+        handler = self._create_handler(name, config)
+        app.add_api_route(f"/api/{name}", handler, methods=["POST"], response_model=None)
 
     async def start_server(self, host: str = "0.0.0.0", port: int = 8080) -> None:
         """Start the API server."""

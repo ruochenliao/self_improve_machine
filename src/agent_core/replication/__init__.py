@@ -2,5 +2,6 @@
 
 from .lineage import LineageTracker, LineageRecord
 from .replicator import ReplicationManager
+from .ipc import IPCBridge, IPCMessage
 
-__all__ = ["LineageTracker", "LineageRecord", "ReplicationManager"]
+__all__ = ["LineageTracker", "LineageRecord", "ReplicationManager", "IPCBridge", "IPCMessage"]

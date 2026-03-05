@@ -78,27 +78,56 @@ CREATE TABLE IF NOT EXISTS ledger (
     creator_share REAL NOT NULL DEFAULT 0.0
 );
 
--- Audit log: self-modification history
+-- Audit log: self-modification history (original schema)
 CREATE TABLE IF NOT EXISTS audit (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     timestamp TEXT NOT NULL DEFAULT (datetime('now')),
-    file_changed TEXT NOT NULL,
+    file_changed TEXT NOT NULL DEFAULT '',
     diff_summary TEXT NOT NULL DEFAULT '',
     reason TEXT NOT NULL DEFAULT '',
-    result TEXT NOT NULL CHECK (result IN ('success', 'failed', 'reverted')),
+    result TEXT NOT NULL DEFAULT 'success' CHECK (result IN ('success', 'failed', 'reverted')),
     commit_sha TEXT NOT NULL DEFAULT ''
+);
+
+-- Audit log: general auditable actions (used by AuditLogger)
+CREATE TABLE IF NOT EXISTS audit_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp REAL NOT NULL,
+    action TEXT NOT NULL DEFAULT '',
+    description TEXT NOT NULL DEFAULT '',
+    details TEXT NOT NULL DEFAULT '{}',
+    success INTEGER NOT NULL DEFAULT 1,
+    actor TEXT NOT NULL DEFAULT 'agent'
 );
 
 -- Lineage: agent replication family tree
 CREATE TABLE IF NOT EXISTS lineage (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    parent_id TEXT NOT NULL,
-    child_id TEXT NOT NULL,
-    generation INTEGER NOT NULL DEFAULT 1,
+    instance_id TEXT NOT NULL DEFAULT '',
+    parent_id TEXT NOT NULL DEFAULT '',
+    child_id TEXT NOT NULL DEFAULT '',
+    generation INTEGER NOT NULL DEFAULT 0,
     birth_time TEXT NOT NULL DEFAULT (datetime('now')),
+    created_at REAL NOT NULL DEFAULT 0,
+    creator TEXT NOT NULL DEFAULT 'human',
+    host TEXT NOT NULL DEFAULT 'localhost',
     status TEXT NOT NULL DEFAULT 'alive' CHECK (status IN ('alive', 'dead')),
     code_hash TEXT NOT NULL DEFAULT '',
     deploy_location TEXT NOT NULL DEFAULT 'local'
+);
+
+-- Digital assets: sellable items
+CREATE TABLE IF NOT EXISTS digital_assets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    asset_id TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL DEFAULT '',
+    description TEXT NOT NULL DEFAULT '',
+    category TEXT NOT NULL DEFAULT '',
+    price REAL NOT NULL DEFAULT 0.0,
+    content TEXT NOT NULL DEFAULT '',
+    created_at REAL NOT NULL DEFAULT 0,
+    downloads INTEGER NOT NULL DEFAULT 0,
+    rating REAL NOT NULL DEFAULT 0.0
 );
 
 -- Action history: recent agent actions for context
@@ -130,7 +159,10 @@ CREATE TABLE IF NOT EXISTS creator_payouts (
 CREATE INDEX IF NOT EXISTS idx_ledger_timestamp ON ledger(timestamp);
 CREATE INDEX IF NOT EXISTS idx_ledger_type ON ledger(type);
 CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit(timestamp);
+CREATE INDEX IF NOT EXISTS idx_audit_log_timestamp ON audit_log(timestamp);
 CREATE INDEX IF NOT EXISTS idx_action_history_cycle ON action_history(cycle_number);
 CREATE INDEX IF NOT EXISTS idx_lineage_parent ON lineage(parent_id);
 CREATE INDEX IF NOT EXISTS idx_lineage_child ON lineage(child_id);
+CREATE INDEX IF NOT EXISTS idx_lineage_instance ON lineage(instance_id);
+CREATE INDEX IF NOT EXISTS idx_digital_assets_id ON digital_assets(asset_id);
 """

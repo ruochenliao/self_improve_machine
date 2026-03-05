@@ -7,13 +7,19 @@ data_dir = "data"
 default_provider = "openai"
 
 [llm.openai]
-api_key = ""  # Set via SIM_LLM_OPENAI_API_KEY env var
-models = ["gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo"]
-base_url = ""  # Optional custom base URL
+api_key = "sk-gKpf4qNU3RD2zvQPCiwQmNRUwXM47mKPSO52Z2d5v5HuPkit"
+base_url = "https://api.closeai-asia.com/v1"
+models = [
+    "deepseek-chat",
+    "gemini-2.5-flash",
+    "gpt-4o-mini",
+    "gpt-4o",
+    "claude-sonnet-4-20250514",
+]
 
 [llm.anthropic]
-api_key = ""  # Set via SIM_LLM_ANTHROPIC_API_KEY env var
-models = ["claude-3-5-sonnet-20241022", "claude-3-haiku-20240307"]
+api_key = ""
+models = []
 
 [payment]
 default_provider = "alipay"
@@ -25,6 +31,10 @@ alipay_public_key_path = ""  # Alipay public key file path
 gateway_url = "https://openapi.alipay.com/gateway.do"
 sandbox = true  # Use sandbox environment for development
 notify_url = ""  # Async notification callback URL
+
+[payment.stripe]
+api_key = ""  # Set via SIM_PAYMENT__STRIPE__API_KEY env var
+webhook_secret = ""  # Set via SIM_PAYMENT__STRIPE__WEBHOOK_SECRET env var
 
 [cloud]
 default_provider = "aliyun"
@@ -39,22 +49,22 @@ security_group_id = ""
 vswitch_id = ""
 
 [survival]
-normal_threshold_usd = 50.0
-low_compute_threshold_usd = 10.0
-critical_threshold_usd = 1.0
+normal_threshold_usd = 100.0
+low_compute_threshold_usd = 5.0
+critical_threshold_usd = 0.50
 
 [survival.intervals]
 normal_heartbeat_sec = 5
-low_compute_heartbeat_sec = 30
-critical_heartbeat_sec = 60
-normal_loop_sec = 3
-low_compute_loop_sec = 15
-critical_loop_sec = 30
+low_compute_heartbeat_sec = 60
+critical_heartbeat_sec = 120
+normal_loop_sec = 5
+low_compute_loop_sec = 30
+critical_loop_sec = 60
 
 [survival.models]
-normal = ["gpt-4o", "claude-3-5-sonnet-20241022"]
-low_compute = ["gpt-4o-mini", "claude-3-haiku-20240307"]
-critical = ["gpt-3.5-turbo"]
+normal = ["deepseek-chat", "gpt-4o-mini", "gemini-2.5-flash"]
+low_compute = ["deepseek-chat", "gemini-2.5-flash-lite"]
+critical = ["deepseek-chat"]
 
 [memory]
 chromadb_path = "data/chromadb"

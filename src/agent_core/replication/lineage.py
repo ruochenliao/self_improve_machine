@@ -77,7 +77,7 @@ class LineageTracker:
                        VALUES (?, ?, ?, ?, ?, ?)""",
                     (
                         self._current.instance_id,
-                        self._current.parent_id,
+                        self._current.parent_id or "",  # NULL -> empty string for NOT NULL constraint
                         self._current.generation,
                         self._current.created_at,
                         self._current.creator,
