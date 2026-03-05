@@ -180,6 +180,19 @@ class ReActLoop:
             except Exception:
                 pass
 
+        # Add promotion platform status
+        try:
+            from agent_core.tools.social_media import get_available_platforms, get_promotion_stats
+            platforms = get_available_platforms()
+            ready = [p for p, ok in platforms.items() if ok]
+            promo_stats = get_promotion_stats()
+            if ready:
+                parts.append(f"Promotion: {', '.join(ready)} ready | {promo_stats['total_posts']} posts sent ({promo_stats['successful']} ok)")
+            else:
+                parts.append("Promotion: No platforms configured yet. Use check_promotion_status for details.")
+        except Exception:
+            pass
+
         # Phase-aware instruction
         if self._cycle_count <= 3:
             parts.append("INSTRUCTION: Verify API server is running (shell_execute: curl localhost:8402/health). If OK, move to creating useful content next cycle.")

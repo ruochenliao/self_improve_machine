@@ -1,49 +1,76 @@
 #!/usr/bin/env python3
 
+"""
+Bold-Phoenix API Code Explainer Tool
+
+This script demonstrates how to use the Bold-Phoenix API to explain code snippets.
+It takes a code snippet as input and returns a clear explanation of its functionality.
+
+Public API Server: https://upgrades-approx-gadgets-hit.trycloudflare.com
+
+Usage:
+    python3 code_explainer_tool.py "def add(a, b): return a + b"
+
+Example:
+    python3 code_explainer_tool.py "
+    import os
+
+    def list_files(directory):
+        files = []
+        for r, d, f in os.walk(directory):
+            for file in f:
+                files.append(os.path.join(r, file))
+        return files
+    "
+"""
+
 import requests
 import json
-import argparse
+import sys
 
-# Your Lucid-Helix API endpoint
-# IMPORTANT: Replace with your actual public URL
-API_BASE_URL = "https://charlotte-fifty-rrp-induced.trycloudflare.com" 
+# Your Bold-Phoenix API endpoint for explaining code
+API_URL = "https://upgrades-approx-gadgets-hit.trycloudflare.com/explain-code"
 
-def explain_code(code_content: str) -> str:
+def explain_code(code_snippet: str) -> dict:
     """
-    Sends code content to the explain-code API and returns the explanation.
+    Sends a code snippet to the Bold-Phoenix API for explanation.
+
+    Args:
+        code_snippet: The code snippet to be explained.
+
+    Returns:
+        A dictionary containing the API response, or an error message.
     """
-    url = f"{API_BASE_URL}/explain-code"
     headers = {"Content-Type": "application/json"}
-    payload = {"code": code_content}
-    
+    payload = {"code": code_snippet}
     try:
-        response = requests.post(url, headers=headers, data=json.dumps(payload))
+        response = requests.post(API_URL, headers=headers, data=json.dumps(payload))
         response.raise_for_status()  # Raise an exception for HTTP errors
-        return response.json().get("explanation", "No explanation received.")
+        return response.json()
     except requests.exceptions.RequestException as e:
-        return f"Error explaining code: {e}"
-
-def main():
-    parser = argparse.ArgumentParser(description="Explain code using the Lucid-Helix API.")
-    parser.add_argument("file_path", help="Path to the code file to explain.")
-    
-    args = parser.parse_args()
-    
-    try:
-        with open(args.file_path, "r") as f:
-            code_content = f.read()
-        
-        print(f"Explaining code from: {args.file_path}...")
-        explanation = explain_code(code_content)
-        print("\n--- Code Explanation ---\n")
-        print(explanation)
-        print("\n------------------------\n")
-        print(f"Powered by Lucid-Helix AI: {API_BASE_URL}")
-        
-    except FileNotFoundError:
-        print(f"Error: File not found at {args.file_path}")
-    except Exception as e:
-        print(f"An unexpected error occurred: {e}")
+        return {"error": f"API request failed: {e}"}
 
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) < 2:
+        print("Usage: python3 code_explainer_tool.py "<code_snippet>"")
+        sys.exit(1)
+
+    code_to_explain = sys.argv[1]
+    print(f"Explaining code snippet:
+---
+{code_to_explain}
+---")
+
+    result = explain_code(code_to_explain)
+
+    if "explanation" in result:
+        print("
+Explanation:")
+        print(result["explanation"])
+    elif "error" in result:
+        print(f"
+Error: {result['error']}")
+    else:
+        print("
+Unexpected API response:")
+        print(json.dumps(result, indent=2))

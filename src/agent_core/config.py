@@ -93,6 +93,38 @@ class MemoryConfig(BaseModel):
     top_k: int = 5
 
 
+class DevtoConfig(BaseModel):
+    api_key: str = ""
+
+
+class RedditConfig(BaseModel):
+    client_id: str = ""
+    client_secret: str = ""
+    username: str = ""
+    password: str = ""
+
+
+class TwitterConfig(BaseModel):
+    bearer_token: str = ""
+    api_key: str = ""
+    api_secret: str = ""
+    access_token: str = ""
+    access_secret: str = ""
+
+
+class WebhookConfig(BaseModel):
+    name: str = ""
+    url: str = ""
+    headers: dict[str, str] = Field(default_factory=dict)
+
+
+class SocialConfig(BaseModel):
+    devto: DevtoConfig = Field(default_factory=DevtoConfig)
+    reddit: RedditConfig = Field(default_factory=RedditConfig)
+    twitter: TwitterConfig = Field(default_factory=TwitterConfig)
+    webhooks: list[WebhookConfig] = Field(default_factory=list)
+
+
 class IncomeConfig(BaseModel):
     api_port: int = 8402
     api_host: str = "0.0.0.0"
@@ -127,6 +159,7 @@ class AgentConfig(BaseSettings):
     survival: SurvivalConfig = Field(default_factory=SurvivalConfig)
     memory: MemoryConfig = Field(default_factory=MemoryConfig)
     income: IncomeConfig = Field(default_factory=IncomeConfig)
+    social: SocialConfig = Field(default_factory=SocialConfig)
     self_mod: SelfModConfig = Field(default_factory=SelfModConfig)
     creator: CreatorConfig = Field(default_factory=CreatorConfig)
 

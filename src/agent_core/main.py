@@ -159,6 +159,27 @@ async def run_agent(
 
     http_client.set_http402_handler(http402_handler)
 
+    # Configure social media promotion tools
+    social_cfg = {
+        "devto": {"api_key": config.social.devto.api_key},
+        "reddit": {
+            "client_id": config.social.reddit.client_id,
+            "client_secret": config.social.reddit.client_secret,
+            "username": config.social.reddit.username,
+            "password": config.social.reddit.password,
+        },
+        "twitter": {
+            "bearer_token": config.social.twitter.bearer_token,
+            "api_key": config.social.twitter.api_key,
+            "api_secret": config.social.twitter.api_secret,
+            "access_token": config.social.twitter.access_token,
+            "access_secret": config.social.twitter.access_secret,
+        },
+        "github": {"token": config.income.github_token},
+        "webhooks": [wh.model_dump() for wh in config.social.webhooks],
+    }
+    social_media.configure(social_cfg, db)
+
     # Initialize survival
     from agent_core.survival.state_machine import SurvivalStateMachine
     from agent_core.survival.balance_monitor import BalanceMonitor

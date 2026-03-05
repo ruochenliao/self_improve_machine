@@ -1,26 +1,25 @@
 #!/usr/bin/env python3
 
 """
-Keen-Vortex: Code Translator CLI Tool
-This script provides a command-line interface to translate code between programming languages
-using the Keen-Vortex API services.
+Bold-Phoenix Code Translator Tool
+Translate code between programming languages using the Bold-Phoenix API
 
-Public API: https://charlotte-fifty-rrp-induced.trycloudflare.com
+Public API: https://upgrades-approx-gadgets-hit.trycloudflare.com
 """
 
 import requests
-import argparse
+import json
 import sys
 
 def translate_code(source_code, source_lang, target_lang):
-    """Translate code from one programming language to another."""
+    """Translate code from one programming language to another"""
     
-    api_url = "https://charlotte-fifty-rrp-induced.trycloudflare.com/translate"
+    api_url = "https://upgrades-approx-gadgets-hit.trycloudflare.com/translate"
     
     payload = {
         "text": source_code,
-        "source_language": source_lang,
-        "target_language": target_lang
+        "source_lang": source_lang,
+        "target_lang": target_lang
     }
     
     try:
@@ -28,43 +27,52 @@ def translate_code(source_code, source_lang, target_lang):
         response.raise_for_status()
         
         result = response.json()
-        return result.get("translated_text", "Translation failed")
-        
+        return result.get('translated_text', 'Translation failed')
+    
     except requests.exceptions.RequestException as e:
         return f"Error calling API: {e}"
 
 def main():
-    parser = argparse.ArgumentParser(description="Translate code between programming languages")
-    parser.add_argument("file", help="Input file containing source code")
-    parser.add_argument("--source", "-s", required=True, help="Source language (e.g., python, javascript, java)")
-    parser.add_argument("--target", "-t", required=True, help="Target language (e.g., python, javascript, java)")
-    parser.add_argument("--output", "-o", help="Output file (default: stdout)")
+    print("=== Bold-Phoenix Code Translator ===")
+    print("Translate code between programming languages")
+    print("Supported: Python, JavaScript, Java, C++, Go, Rust, etc.\n")
     
-    args = parser.parse_args()
-    
-    # Read source code
-    try:
-        with open(args.file, 'r') as f:
-            source_code = f.read()
-    except FileNotFoundError:
-        print(f"Error: File '{args.file}' not found")
-        sys.exit(1)
-    
-    print(f"Translating {args.source} code to {args.target}...")
-    
-    # Translate the code
-    translated_code = translate_code(source_code, args.source, args.target)
-    
-    # Output result
-    if args.output:
-        with open(args.output, 'w') as f:
-            f.write(translated_code)
-        print(f"Translation saved to: {args.output}")
+    if len(sys.argv) > 1:
+        # File mode
+        filename = sys.argv[1]
+        try:
+            with open(filename, 'r') as f:
+                source_code = f.read()
+        except FileNotFoundError:
+            print(f"Error: File '{filename}' not found")
+            return
     else:
-        print("\n" + "="*50)
-        print("TRANSLATED CODE:")
-        print("="*50)
-        print(translated_code)
+        # Interactive mode
+        print("Enter your source code (Ctrl+D to finish):")
+        source_code = sys.stdin.read()
+    
+    print("\nEnter source language (e.g., python, javascript, java):")
+    source_lang = input("> ").strip().lower()
+    
+    print("Enter target language (e.g., python, javascript, java):")
+    target_lang = input("> ").strip().lower()
+    
+    print("\nTranslating code...")
+    
+    translated_code = translate_code(source_code, source_lang, target_lang)
+    
+    print(f"\n=== Translated Code ({target_lang.upper()}) ===")
+    print(translated_code)
+    
+    # Save to file option
+    print(f"\nSave to file? (y/n)")
+    save_choice = input("> ").strip().lower()
+    
+    if save_choice == 'y':
+        output_file = f"translated_code.{target_lang}"
+        with open(output_file, 'w') as f:
+            f.write(translated_code)
+        print(f"Saved to {output_file}")
 
 if __name__ == "__main__":
     main()

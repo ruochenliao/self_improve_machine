@@ -1,62 +1,66 @@
 #!/usr/bin/env python3
 
 """
-Keen-Vortex Code Review CLI Tool
-A simple command-line interface to review code using the Keen-Vortex API.
+Bold-Phoenix Code Review CLI Tool
 
-Public API: https://charlotte-fifty-rrp-induced.trycloudflare.com
+A command-line tool that uses the Bold-Phoenix API to review code files.
+Provides instant AI-powered code reviews for any programming language.
+
+Usage: python code_review_cli.py <file_path> [--pro]
+
+Public API: https://upgrades-approx-gadgets-hit.trycloudflare.com
 """
 
-import requests
 import argparse
+import requests
 import sys
-from pathlib import Path
+import os
 
-API_BASE = "https://charlotte-fifty-rrp-induced.trycloudflare.com"
+API_BASE = "https://upgrades-approx-gadgets-hit.trycloudflare.com"
 
-def review_code(code: str, language: str = "python") -> str:
-    """Send code to the Keen-Vortex code review API."""
-    url = f"{API_BASE}/api/code-review"
+def get_code_review(code_content, use_pro=False):
+    """Get code review from Bold-Phoenix API"""
+    endpoint = "/code-review-pro" if use_pro else "/code-review"
+    url = f"{API_BASE}{endpoint}"
     
     payload = {
-        "code": code,
-        "language": language
+        "code": code_content,
+        "language": "auto"
     }
     
     try:
         response = requests.post(url, json=payload)
         response.raise_for_status()
         return response.json()["review"]
-    except requests.exceptions.RequestException as e:
-        return f"Error calling API: {e}"
+    except Exception as e:
+        return f"Error getting code review: {e}"
 
 def main():
-    parser = argparse.ArgumentParser(description="Review code using Keen-Vortex AI")
-    parser.add_argument("file", help="Path to the code file to review")
-    parser.add_argument("--language", "-l", default="python", 
-                       help="Programming language (default: python)")
+    parser = argparse.ArgumentParser(description="Bold-Phoenix Code Review CLI")
+    parser.add_argument("file_path", help="Path to the code file to review")
+    parser.add_argument("--pro", action="store_true", help="Use GPT-4o Pro service")
     
     args = parser.parse_args()
     
-    file_path = Path(args.file)
-    if not file_path.exists():
-        print(f"Error: File '{args.file}' not found")
+    if not os.path.exists(args.file_path):
+        print(f"Error: File '{args.file_path}' not found")
         sys.exit(1)
     
     try:
-        code = file_path.read_text()
+        with open(args.file_path, 'r', encoding='utf-8') as f:
+            code_content = f.read()
     except Exception as e:
         print(f"Error reading file: {e}")
         sys.exit(1)
     
-    print(f"🔍 Reviewing {file_path.name} ({args.language})...")
-    print("-" * 50)
+    print(f"🔍 Reviewing {args.file_path} with Bold-Phoenix {'Pro' if args.pro else 'Standard'} API...")
+    print("-" * 60)
     
-    review = review_code(code, args.language)
+    review = get_code_review(code_content, args.pro)
+    
     print(review)
-    
-    print("\n" + "=" * 50)
-    print(f"💡 Powered by Keen-Vortex AI")
+    print("-" * 60)
+    print(f"✅ Review complete! Powered by Bold-Phoenix AI")
     print(f"🌐 API: {API_BASE}")
 
 if __name__ == "__main__":

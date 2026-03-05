@@ -1,77 +1,105 @@
 #!/usr/bin/env python3
 
 """
-Keen-Vortex Web App Generator
-Generate complete web applications using the Keen-Vortex API
-Public API: https://charlotte-fifty-rrp-induced.trycloudflare.com
+Bold-Phoenix Web App Generator
+A powerful tool that uses the Bold-Phoenix API to generate complete web applications.
+
+Public API: https://upgrades-approx-gadgets-hit.trycloudflare.com
+Free playground available - no signup required!
 """
 
 import requests
 import json
 import sys
+import os
 
-def generate_web_app(app_type, description):
-    """Generate a complete web application using Keen-Vortex API"""
-    
-    api_url = "https://charlotte-fifty-rrp-induced.trycloudflare.com/generate-code-pro"
+API_BASE = "https://upgrades-approx-gadgets-hit.trycloudflare.com"
+
+def generate_web_app(app_name, description, features):
+    """Generate a complete web application using the Bold-Phoenix API."""
     
     prompt = f"""
-Create a complete {app_type} web application based on this description:
-{description}
+Create a complete web application for: {app_name}
 
-Requirements:
-- Use Flask or FastAPI framework
-- Include HTML templates with modern CSS
-- Add database integration (SQLite)
-- Include error handling
-- Add basic authentication
-- Make it production-ready
+Description: {description}
 
-Provide the complete code structure with all files needed.
+Features needed: {', '.join(features)}
+
+Please generate:
+1. A main Flask/FastAPI application file
+2. HTML templates for the frontend
+3. CSS styling
+4. Basic JavaScript functionality
+5. A requirements.txt file
+6. README with setup instructions
+
+Make it production-ready and easy to deploy.
 """
     
-    payload = {
-        "prompt": prompt,
-        "language": "python"
-    }
-    
     try:
-        response = requests.post(api_url, json=payload)
-        response.raise_for_status()
+        response = requests.post(
+            f"{API_BASE}/generate-code",
+            json={"prompt": prompt},
+            headers={"Content-Type": "application/json"}
+        )
         
-        result = response.json()
-        return result.get("code", "Error: No code generated")
-        
-    except requests.exceptions.RequestException as e:
-        return f"Error calling API: {e}"
+        if response.status_code == 200:
+            result = response.json()
+            return result.get("result", "Error: No result returned")
+        else:
+            return f"Error: {response.status_code} - {response.text}"
+    except Exception as e:
+        return f"Error calling API: {str(e)}"
 
 def main():
-    print("Keen-Vortex Web App Generator")
-    print("==============================")
+    print("=== Bold-Phoenix Web App Generator ===")
+    print(f"Using API: {API_BASE}")
+    print("Free playground available - no signup required!\n")
     
-    if len(sys.argv) < 3:
-        print("Usage: python web_app_generator.py <app_type> <description>")
-        print("Example: python web_app_generator.py todo 'A simple todo app with user authentication'")
-        sys.exit(1)
+    if len(sys.argv) > 1:
+        app_name = sys.argv[1]
+    else:
+        app_name = input("Enter your app name: ")
     
-    app_type = sys.argv[1]
-    description = " ".join(sys.argv[2:])
+    if len(sys.argv) > 2:
+        description = sys.argv[2]
+    else:
+        description = input("Enter app description: ")
     
-    print(f"Generating {app_type} application...")
+    print("\nCommon features (press Enter to skip or add your own):")
+    print("1. User authentication")
+    print("2. Database integration")
+    print("3. REST API endpoints")
+    print("4. Responsive design")
+    print("5. File upload")
     
-    code = generate_web_app(app_type, description)
+    features = []
+    while True:
+        feature = input("\nEnter a feature (or press Enter to finish): ")
+        if not feature:
+            break
+        features.append(feature)
     
-    print("\nGenerated Code:")
-    print("=" * 50)
-    print(code)
+    if not features:
+        features = ["User authentication", "Database integration", "REST API"]
+    
+    print(f"\nGenerating web application: {app_name}")
+    print("This may take a moment...\n")
+    
+    result = generate_web_app(app_name, description, features)
     
     # Save to file
-    filename = f"{app_type}_app.py"
-    with open(filename, "w") as f:
-        f.write(code)
+    filename = f"{app_name.replace(' ', '_').lower()}_app.py"
+    with open(filename, 'w') as f:
+        f.write(result)
     
-    print(f"\nCode saved to {filename}")
-    print("\nPowered by Keen-Vortex API: https://charlotte-fifty-rrp-induced.trycloudflare.com")
+    print(f"✅ Web application generated successfully!")
+    print(f"📁 Saved as: {filename}")
+    print(f"\n🔗 Try our other services:")
+    print(f"- Code Review: {API_BASE}/code-review")
+    print(f"- Bug Fixing: {API_BASE}/fix-bug") 
+    print(f"- Chat: {API_BASE}/chat")
+    print(f"\n💡 All services have free playgrounds - no signup required!")
 
 if __name__ == "__main__":
     main()

@@ -1,90 +1,69 @@
 #!/usr/bin/env python3
 
 """
-Keen-Vortex: Smart Code Summarizer
-This script uses the Keen-Vortex API to summarize provided code snippets.
-It's a practical tool for developers to quickly grasp the essence of code without deep diving.
+Bold-Phoenix Code Summarizer Tool
+A practical CLI tool that uses the Bold-Phoenix API to generate concise summaries of code files.
 
-Public API Server: https://charlotte-fifty-rrp-induced.trycloudflare.com
+Public API: https://upgrades-approx-gadgets-hit.trycloudflare.com
+Free to use - no API key required!
 
 Usage:
-  python3 code_summarizer_tool.py "def add(a, b): return a + b"
-  python3 code_summarizer_tool.py -f my_code.py
+    python3 code_summarizer_tool.py <file_path>
+    python3 code_summarizer_tool.py --help
 """
 
 import argparse
 import requests
-import json
 import sys
+import os
 
-API_BASE_URL = "https://charlotte-fifty-rrp-induced.trycloudflare.com" # Your Keen-Vortex API endpoint
+API_BASE = "https://upgrades-approx-gadgets-hit.trycloudflare.com"
 
-def summarize_code(code_content: str) -> str:
-    """
-    Summarizes the given code content using the Keen-Vortex summarize API.
-    """
-    url = f"{API_BASE_URL}/summarize"
-    headers = {"Content-Type": "application/json"}
-    payload = {"text": code_content}
-
+def summarize_code(code_content, use_pro=False):
+    """Send code to Bold-Phoenix API for summarization."""
+    endpoint = "/summarize" if not use_pro else "/summarize-pro"
+    url = API_BASE + endpoint
+    
+    payload = {
+        "text": code_content,
+        "max_length": 200
+    }
+    
     try:
-        response = requests.post(url, headers=headers, data=json.dumps(payload))
-        response.raise_for_status()  # Raise an exception for HTTP errors
-        result = response.json()
-        if result and "summary" in result:
-            return result["summary"]
-        else:
-            return f"Error: Unexpected API response format: {result}"
+        response = requests.post(url, json=payload)
+        response.raise_for_status()
+        return response.json().get("summary", "No summary generated")
     except requests.exceptions.RequestException as e:
-        return f"Error connecting to API: {e}"
-    except json.JSONDecodeError:
-        return f"Error: Could not decode JSON response from API: {response.text}"
+        return f"Error calling API: {e}"
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Keen-Vortex Code Summarizer: Summarize code using the Keen-Vortex API."
-    )
-    parser.add_argument(
-        "code_string",
-        nargs="?",
-        help="The code string to summarize. Use with -f to summarize a file."
-    )
-    parser.add_argument(
-        "-f", "--file",
-        metavar="FILE",
-        help="Path to a file containing the code to summarize."
-    )
-
+    parser = argparse.ArgumentParser(description='Summarize code files using Bold-Phoenix AI')
+    parser.add_argument('file_path', help='Path to the code file to summarize')
+    parser.add_argument('--pro', action='store_true', help='Use GPT-4o pro service (higher quality)')
+    
     args = parser.parse_args()
-
-    code_to_summarize = ""
-    if args.file:
-        try:
-            with open(args.file, "r") as f:
-                code_to_summarize = f.read()
-        except FileNotFoundError:
-            print(f"Error: File not found at '{args.file}'", file=sys.stderr)
-            sys.exit(1)
-        except Exception as e:
-            print(f"Error reading file '{args.file}': {e}", file=sys.stderr)
-            sys.exit(1)
-    elif args.code_string:
-        code_to_summarize = args.code_string
-    else:
-        print("Error: Please provide either a code string or a file path.", file=sys.stderr)
-        parser.print_help()
+    
+    if not os.path.exists(args.file_path):
+        print(f"Error: File '{args.file_path}' not found")
         sys.exit(1)
-
-    if not code_to_summarize.strip():
-        print("No code provided to summarize.", file=sys.stderr)
+    
+    try:
+        with open(args.file_path, 'r', encoding='utf-8') as f:
+            code_content = f.read()
+    except Exception as e:
+        print(f"Error reading file: {e}")
         sys.exit(1)
-
-    print("Summarizing code using Keen-Vortex API...")
-    summary = summarize_code(code_to_summarize)
-    print("
---- Summary ---")
+    
+    print(f"📄 Summarizing: {args.file_path}")
+    print(f"🔧 Using: {'GPT-4o Pro' if args.pro else 'Standard'}")
+    print("-" * 50)
+    
+    summary = summarize_code(code_content, args.pro)
+    
+    print("📋 CODE SUMMARY:")
     print(summary)
-    print("---------------")
+    print("-" * 50)
+    print(f"💡 Try more services at: {API_BASE}")
 
 if __name__ == "__main__":
     main()

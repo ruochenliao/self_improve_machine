@@ -1,75 +1,86 @@
 #!/usr/bin/env python3
 
 """
-Keen-Vortex Code Snippet Generator
-A CLI tool that generates code snippets using the Keen-Vortex API
+Bold-Phoenix Code Snippet Generator
 
-Your API endpoint: https://charlotte-fifty-rrp-induced.trycloudflare.com
-Free playground available - no API key required!
+A command-line tool that generates code snippets using the Bold-Phoenix API.
+Perfect for quickly generating boilerplate code, utility functions, or learning examples.
+
+Public API: https://upgrades-approx-gadgets-hit.trycloudflare.com
 """
 
 import requests
 import json
 import sys
 
-def generate_code_snippet(language, description, complexity="simple"):
-    """Generate a code snippet using the Keen-Vortex API"""
+def generate_code_snippet(prompt, language="python", service="generate-code"):
+    """Generate a code snippet using the Bold-Phoenix API."""
     
-    api_url = "https://charlotte-fifty-rrp-induced.trycloudflare.com/generate-code"
+    api_url = "https://upgrades-approx-gadgets-hit.trycloudflare.com"
     
     payload = {
-        "language": language,
-        "description": description,
-        "complexity": complexity
+        "prompt": f"Generate {language} code for: {prompt}",
+        "language": language
     }
     
     try:
-        response = requests.post(api_url, json=payload)
+        response = requests.post(f"{api_url}/{service}", json=payload)
         response.raise_for_status()
-        return response.json()
+        
+        result = response.json()
+        return result.get("code", "Error: No code generated")
+        
     except requests.exceptions.RequestException as e:
-        return {"error": f"API request failed: {e}"}
+        return f"Error calling API: {e}"
 
 def main():
-    print("🔧 Keen-Vortex Code Snippet Generator")
-    print("=" * 50)
+    print("=== Bold-Phoenix Code Snippet Generator ===")
+    print("Generate code snippets instantly using AI")
+    print("Public API: https://upgrades-approx-gadgets-hit.trycloudflare.com\n")
     
-    if len(sys.argv) < 3:
-        print("Usage: python code_snippet_generator.py <language> <description> [complexity]")
-        print("\nExamples:")
-        print("  python code_snippet_generator.py python 'function to calculate factorial'")
-        print("  python code_snippet_generator.py javascript 'sort array of objects by property'")
-        print("  python code_snippet_generator.py python 'web scraper using requests' complex")
-        sys.exit(1)
-    
-    language = sys.argv[1]
-    description = sys.argv[2]
-    complexity = sys.argv[3] if len(sys.argv) > 3 else "simple"
-    
-    print(f"\nGenerating {language} code snippet...")
-    print(f"Description: {description}")
-    print(f"Complexity: {complexity}")
-    
-    result = generate_code_snippet(language, description, complexity)
-    
-    if "error" in result:
-        print(f"\n❌ Error: {result['error']}")
+    if len(sys.argv) > 1:
+        # Command-line mode
+        prompt = " ".join(sys.argv[1:])
+        code = generate_code_snippet(prompt)
+        print(f"\nGenerated code:\n{code}")
     else:
-        print("\n✅ Code generated successfully!")
-        print("-" * 40)
-        
-        if "code" in result:
-            print(result["code"])
-        elif "response" in result:
-            print(result["response"])
-        else:
-            print(json.dumps(result, indent=2))
-        
-        print("\n💡 Try our other services:")
-        print("- Code Review: $0.02 per request")
-        print("- Bug Fixing: $0.05 per request") 
-        print("- Test Writing: $0.03 per request")
-        print("\n🌐 Visit: https://charlotte-fifty-rrp-induced.trycloudflare.com")
+        # Interactive mode
+        while True:
+            print("What code would you like to generate?")
+            print("Examples: 'fibonacci function', 'read CSV file', 'web scraper'")
+            print("Type 'quit' to exit\n")
+            
+            prompt = input("Prompt: ").strip()
+            
+            if prompt.lower() in ['quit', 'exit', 'q']:
+                break
+                
+            if not prompt:
+                continue
+                
+            print("\nGenerating code...")
+            
+            # Ask for language preference
+            language = input("Language (python/javascript/java/cpp, default=python): ").strip()
+            if not language:
+                language = "python"
+            
+            code = generate_code_snippet(prompt, language)
+            
+            print(f"\n=== Generated {language.upper()} Code ===")
+            print(code)
+            print("=" * 50)
+            
+            # Offer to save to file
+            save = input("\nSave to file? (y/n): ").strip().lower()
+            if save == 'y':
+                filename = input("Filename (e.g., generated_code.py): ").strip()
+                if filename:
+                    with open(filename, 'w') as f:
+                        f.write(code)
+                    print(f"Code saved to {filename}")
+            
+            print()
 
 if __name__ == "__main__":
     main()

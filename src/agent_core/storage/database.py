@@ -210,4 +210,6 @@ CREATE INDEX IF NOT EXISTS idx_lineage_instance ON lineage(instance_id);
 CREATE INDEX IF NOT EXISTS idx_digital_assets_id ON digital_assets(asset_id);
 CREATE INDEX IF NOT EXISTS idx_api_keys_key ON api_keys(api_key);
 CREATE INDEX IF NOT EXISTS idx_api_key_usage_key ON api_key_usage(api_key);
+CREATE INDEX IF NOT EXISTS idx_promotion_log_platform ON promotion_log(platform);
+CREATE INDEX IF NOT EXISTS idx_promotion_log_timestamp ON promotion_log(timestamp);
 """
