@@ -180,21 +180,20 @@ class ReActLoop:
 
         # Phase-aware instruction
         if self._cycle_count <= 3:
-            parts.append("INSTRUCTION: Verify API server is running (shell_execute: curl localhost:8402/health). If OK, move to building services next cycle.")
-        elif self._cycle_count <= 50:
-            parts.append(
-                "INSTRUCTION: Your API server at localhost:8402 already has 9 services (chat, code-review, translate, summarize, generate-code, explain-code, fix-bug, write-tests, status). "
-                "They are running and working. Do NOT keep reading api_service.py — you already know what's there. "
-                "Instead, take ONE of these actions:\n"
-                "1. Use http_request to search for opportunities (GitHub issues, freelance platforms)\n"
-                "2. Use write_file to create a landing page (index.html) advertising your API services\n"
-                "3. Use safe_self_modify to improve service quality or add caching\n"
-                "4. Use shell_execute to check recent API request logs: tail -20 data/agent.log | grep 'api:'\n"
-                "5. Use write_code to create useful scripts/tools you can package as digital products\n"
-                "Pick a DIFFERENT action each cycle. Do NOT read the same file twice."
-            )
+            parts.append("INSTRUCTION: Verify API server is running (shell_execute: curl localhost:8402/health). If OK, move to promoting services next cycle.")
         else:
-            parts.append("INSTRUCTION: Improve existing services, optimize costs, or create digital products. Build something with each cycle. Do NOT repeat failed actions.")
+            parts.append(
+                "INSTRUCTION: Your 14 API services are LIVE on the public internet at "
+                "https://originally-governance-determined-standard.trycloudflare.com . "
+                "DO NOT modify api_service.py or main.py — everything works. "
+                "Focus on ONE of these actions per cycle:\n"
+                "1. Use http_request to promote your services (post to Reddit/HN/Dev.to/Twitter)\n"
+                "2. Use write_file to create useful content (tutorials, scripts, tools)\n"
+                "3. Use shell_execute to check incoming traffic: tail -30 data/agent.log | grep 'api:'\n"
+                "4. Use http_request to find GitHub issues you could solve with your API\n"
+                "5. Create a blog post or documentation about your services\n"
+                "Pick a DIFFERENT action each cycle. DO NOT read api_service.py or main.py."
+            )
 
         return "\n".join(parts)
 

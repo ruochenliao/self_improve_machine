@@ -451,6 +451,103 @@ async def run_agent(
     api_service_mgr.register_service("fix-bug", "Find and fix bugs in code", price_per_request=0.05, handler=_fix_bug_handler)
     api_service_mgr.register_service("write-tests", "Generate unit tests for code", price_per_request=0.03, handler=_write_tests_handler)
 
+    # === PRO tier services (use GPT-4o for higher quality, higher price) ===
+    async def _pro_chat_handler(body: dict) -> dict:
+        """Pro AI chat — uses normal tier (GPT-4o)."""
+        prompt = body.get("prompt", body.get("message", ""))
+        if not prompt:
+            return {"error": "Missing 'prompt' field"}
+        try:
+            resp = await router.chat(
+                messages=[{"role": "user", "content": prompt}],
+                tier="normal",
+            )
+            cost = resp.usage.total_cost_usd
+            await ledger.record_expense(cost, category="llm", description="Pro chat serving", counterparty=resp.model)
+            return {"response": resp.content, "model": resp.model}
+        except Exception as e:
+            return {"error": str(e)}
+
+    async def _pro_code_review_handler(body: dict) -> dict:
+        """Pro code review — uses normal tier (GPT-4o)."""
+        code = body.get("code", "")
+        language = body.get("language", "python")
+        if not code:
+            return {"error": "Missing 'code' field"}
+        try:
+            resp = await router.chat(
+                messages=[{"role": "user", "content": f"Review this {language} code thoroughly. Point out bugs, security issues, performance problems, and suggest improvements:\n```{language}\n{code}\n```"}],
+                tier="normal",
+            )
+            cost = resp.usage.total_cost_usd
+            await ledger.record_expense(cost, category="llm", description="Pro code review serving", counterparty=resp.model)
+            return {"review": resp.content, "model": resp.model}
+        except Exception as e:
+            return {"error": str(e)}
+
+    async def _pro_generate_code_handler(body: dict) -> dict:
+        """Pro code generation — uses normal tier (GPT-4o)."""
+        description = body.get("description", body.get("prompt", ""))
+        language = body.get("language", "python")
+        if not description:
+            return {"error": "Missing 'description' field"}
+        try:
+            resp = await router.chat(
+                messages=[{"role": "user", "content": f"Write production-quality {language} code for: {description}\nInclude error handling, type hints, and docstrings. Output ONLY the code."}],
+                tier="normal",
+            )
+            cost = resp.usage.total_cost_usd
+            await ledger.record_expense(cost, category="llm", description="Pro code gen serving", counterparty=resp.model)
+            return {"code": resp.content, "language": language, "model": resp.model}
+        except Exception as e:
+            return {"error": str(e)}
+
+    async def _pro_fix_bug_handler(body: dict) -> dict:
+        """Pro bug fixing — uses normal tier (GPT-4o)."""
+        code = body.get("code", "")
+        error = body.get("error", body.get("bug", ""))
+        language = body.get("language", "python")
+        if not code:
+            return {"error": "Missing 'code' field"}
+        try:
+            prompt = f"Fix all bugs in this {language} code. Explain what was wrong, then output the corrected code."
+            if error:
+                prompt += f"\nReported error: {error}"
+            prompt += f"\n```{language}\n{code}\n```"
+            resp = await router.chat(
+                messages=[{"role": "user", "content": prompt}],
+                tier="normal",
+            )
+            cost = resp.usage.total_cost_usd
+            await ledger.record_expense(cost, category="llm", description="Pro bug fix serving", counterparty=resp.model)
+            return {"fixed_code": resp.content, "model": resp.model}
+        except Exception as e:
+            return {"error": str(e)}
+
+    async def _pro_write_tests_handler(body: dict) -> dict:
+        """Pro test generation — uses normal tier (GPT-4o)."""
+        code = body.get("code", "")
+        language = body.get("language", "python")
+        framework = body.get("framework", "pytest" if language == "python" else "jest")
+        if not code:
+            return {"error": "Missing 'code' field"}
+        try:
+            resp = await router.chat(
+                messages=[{"role": "user", "content": f"Write comprehensive {framework} tests for this {language} code. Cover edge cases, error handling, and boundary conditions. Output ONLY test code:\n```{language}\n{code}\n```"}],
+                tier="normal",
+            )
+            cost = resp.usage.total_cost_usd
+            await ledger.record_expense(cost, category="llm", description="Pro test gen serving", counterparty=resp.model)
+            return {"tests": resp.content, "framework": framework, "model": resp.model}
+        except Exception as e:
+            return {"error": str(e)}
+
+    api_service_mgr.register_service("chat-pro", "AI chat powered by GPT-4o (higher quality)", price_per_request=0.10, handler=_pro_chat_handler)
+    api_service_mgr.register_service("code-review-pro", "AI code review by GPT-4o", price_per_request=0.20, handler=_pro_code_review_handler)
+    api_service_mgr.register_service("generate-code-pro", "Code generation by GPT-4o", price_per_request=0.25, handler=_pro_generate_code_handler)
+    api_service_mgr.register_service("fix-bug-pro", "Bug fixing by GPT-4o", price_per_request=0.30, handler=_pro_fix_bug_handler)
+    api_service_mgr.register_service("write-tests-pro", "Test generation by GPT-4o", price_per_request=0.25, handler=_pro_write_tests_handler)
+
     # Initialize constitution
     from agent_core.agent.constitution import ConstitutionGuard
     constitution = ConstitutionGuard(project_root / "CONSTITUTION.md")
