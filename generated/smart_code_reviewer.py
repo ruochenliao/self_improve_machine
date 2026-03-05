@@ -1,62 +1,66 @@
 #!/usr/bin/env python3
 """
-Smart Code Reviewer - A CLI tool that uses Lucid-Helix AI API to review your code
+Keen-Vortex Smart Code Reviewer
+A command-line tool that uses the Keen-Vortex API to review code for bugs, style issues, and improvements.
+
 Public API: https://charlotte-fifty-rrp-induced.trycloudflare.com
 """
 
 import requests
-import json
 import argparse
 import sys
-from pathlib import Path
 
-API_BASE = "https://charlotte-fifty-rrp-induced.trycloudflare.com"
-
-def review_code(code: str, language: str = "python") -> str:
-    """Send code to Lucid-Helix API for review"""
-    url = f"{API_BASE}/api/code-review"
+def code_review(code_content, use_pro=False):
+    """Send code to Keen-Vortex API for review"""
+    
+    base_url = "https://charlotte-fifty-rrp-induced.trycloudflare.com"
+    endpoint = "/code-review-pro" if use_pro else "/code-review"
     
     payload = {
-        "code": code,
-        "language": language
+        "code": code_content
     }
     
     try:
-        response = requests.post(url, json=payload)
+        response = requests.post(f"{base_url}{endpoint}", json=payload)
         response.raise_for_status()
-        return response.json().get("review", "No review received")
-    except Exception as e:
-        return f"Error: {str(e)}"
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"Error calling API: {e}")
+        return None
 
 def main():
-    parser = argparse.ArgumentParser(description="Smart Code Reviewer using Lucid-Helix AI")
-    parser.add_argument("file", help="Path to the code file to review")
-    parser.add_argument("--language", "-l", default="python", 
-                       help="Programming language (default: python)")
+    parser = argparse.ArgumentParser(description='Smart Code Reviewer using Keen-Vortex AI')
+    parser.add_argument('file', help='Python file to review')
+    parser.add_argument('--pro', action='store_true', help='Use GPT-4o Pro service ($0.20)')
     
     args = parser.parse_args()
     
-    file_path = Path(args.file)
-    if not file_path.exists():
+    try:
+        with open(args.file, 'r') as f:
+            code = f.read()
+    except FileNotFoundError:
         print(f"Error: File '{args.file}' not found")
         sys.exit(1)
     
-    try:
-        code = file_path.read_text()
-    except Exception as e:
-        print(f"Error reading file: {e}")
-        sys.exit(1)
-    
-    print(f"🔍 Reviewing {file_path.name} ({args.language})...")
+    print(f"🔍 Reviewing {args.file} with Keen-Vortex {'Pro' if args.pro else 'Standard'} service...")
     print("-" * 60)
     
-    review = review_code(code, args.language)
+    result = code_review(code, args.pro)
     
-    print("📝 CODE REVIEW RESULTS:")
-    print("-" * 60)
-    print(review)
-    print("-" * 60)
-    print(f"💡 Powered by Lucid-Helix AI: {API_BASE}")
+    if result and 'review' in result:
+        print("📝 CODE REVIEW REPORT")
+        print("=" * 60)
+        print(result['review'])
+        print("=" * 60)
+        
+        if args.pro:
+            print("💎 Powered by Keen-Vortex Pro (GPT-4o) - $0.20 per review")
+        else:
+            print("🚀 Powered by Keen-Vortex Standard - $0.02 per review")
+        
+        print(f"\n🌐 Try more services at: https://charlotte-fifty-rrp-induced.trycloudflare.com")
+    else:
+        print("❌ Failed to get code review. Please check your connection.")
 
 if __name__ == "__main__":
     main()

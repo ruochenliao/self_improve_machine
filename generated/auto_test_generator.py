@@ -1,63 +1,66 @@
 #!/usr/bin/env python3
 """
-Keen-Vortex Auto Test Generator
-A tool that automatically generates unit tests for your Python code using the Keen-Vortex API.
-
-Usage: python auto_test_generator.py your_code.py
-
-Your API endpoint: https://charlotte-fifty-rrp-induced.trycloudflare.com
+Keen-Vortex: Automated Test Generator
+Generate comprehensive test cases for your Python code using AI
+Public API: https://charlotte-fifty-rrp-induced.trycloudflare.com
 """
 
 import requests
+import json
 import sys
-import argparse
+import os
 
-API_BASE = "https://charlotte-fifty-rrp-induced.trycloudflare.com"
-
-def generate_tests(code_content):
-    """Generate unit tests using the write-tests API endpoint."""
+def generate_tests(code_content, api_url="https://charlotte-fifty-rrp-induced.trycloudflare.com"):
+    """Generate test cases for the given Python code"""
+    
+    endpoint = f"{api_url}/api/write-tests"
+    
     payload = {
-        "code": code_content
+        "code": code_content,
+        "language": "python"
     }
     
     try:
-        response = requests.post(f"{API_BASE}/write-tests", json=payload)
+        response = requests.post(endpoint, json=payload)
         response.raise_for_status()
-        return response.json()["tests"]
-    except Exception as e:
-        print(f"Error generating tests: {e}")
-        return None
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        return {"error": f"API request failed: {e}"}
 
 def main():
-    parser = argparse.ArgumentParser(description="Generate unit tests for Python code")
-    parser.add_argument("file", help="Python file to generate tests for")
-    parser.add_argument("--output", "-o", help="Output file for tests (default: test_<filename>.py)")
-    
-    args = parser.parse_args()
-    
-    try:
-        with open(args.file, 'r') as f:
-            code = f.read()
-    except FileNotFoundError:
-        print(f"Error: File '{args.file}' not found")
+    if len(sys.argv) != 2:
+        print("Usage: python auto_test_generator.py <python_file>")
         sys.exit(1)
     
-    print(f"Generating tests for {args.file}...")
-    tests = generate_tests(code)
+    file_path = sys.argv[1]
     
-    if tests:
-        output_file = args.output or f"test_{args.file}"
-        with open(output_file, 'w') as f:
-            f.write(tests)
-        print(f"Tests generated successfully! Saved to {output_file}")
-        print(f"\nTo run the tests: python -m pytest {output_file}")
-    else:
-        print("Failed to generate tests")
+    if not os.path.exists(file_path):
+        print(f"Error: File '{file_path}' not found")
+        sys.exit(1)
+    
+    with open(file_path, 'r') as f:
+        code_content = f.read()
+    
+    print(f"Generating tests for {file_path}...")
+    result = generate_tests(code_content)
+    
+    if "error" in result:
+        print(f"Error: {result['error']}")
+        sys.exit(1)
+    
+    # Extract the generated test code
+    test_code = result.get("tests", "")
+    
+    # Create test file name
+    base_name = os.path.splitext(file_path)[0]
+    test_file = f"{base_name}_test.py"
+    
+    with open(test_file, 'w') as f:
+        f.write(test_code)
+    
+    print(f"✅ Tests generated successfully!")
+    print(f"📁 Test file saved as: {test_file}")
+    print(f"\nPowered by Keen-Vortex API: https://charlotte-fifty-rrp-induced.trycloudflare.com")
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python auto_test_generator.py your_code.py")
-        print("Example: python auto_test_generator.py my_module.py")
-        sys.exit(1)
-    
     main()

@@ -1,56 +1,77 @@
 #!/usr/bin/env python3
 
+"""
+Keen-Vortex Code Review Tool
+Automatically review your code using the Keen-Vortex API
+Public API: https://charlotte-fifty-rrp-induced.trycloudflare.com
+"""
+
 import requests
 import json
-import argparse
+import sys
+import os
 
-# Your Lucid-Helix API endpoint (replace with your actual public URL)
-API_BASE_URL = "https://charlotte-fifty-rrp-induced.trycloudflare.com" 
-
-def review_code(code_snippet: str, is_pro: bool = False):
-    """
-    Sends a code snippet to the Lucid-Helix API for code review.
-    """
-    endpoint = "/code-review-pro" if is_pro else "/code-review"
-    url = f"{API_BASE_URL}{endpoint}"
+def review_code(code: str, api_key: str = None) -> str:
+    """Send code to Keen-Vortex API for review"""
+    
+    url = "https://charlotte-fifty-rrp-induced.trycloudflare.com/code-review"
+    
+    payload = {
+        "code": code,
+        "language": "python"
+    }
+    
     headers = {"Content-Type": "application/json"}
-    payload = {"code": code_snippet}
-
-    print(f"Sending code for review to: {url}")
+    if api_key:
+        headers["X-API-Key"] = api_key
+    
     try:
-        response = requests.post(url, headers=headers, data=json.dumps(payload))
-        response.raise_for_status()  # Raise an exception for HTTP errors
-        review_result = response.json()
-        return review_result
-    except requests.exceptions.RequestException as e:
-        print(f"Error during API request: {e}")
-        if response is not None:
-            print(f"Response status code: {response.status_code}")
-            print(f"Response body: {response.text}")
-        return None
+        response = requests.post(url, json=payload, headers=headers)
+        response.raise_for_status()
+        return response.json()["review"]
+    except Exception as e:
+        return f"Error: {str(e)}"
 
 def main():
-    parser = argparse.ArgumentParser(description="Lucid-Helix Code Review Tool")
-    parser.add_argument("file", help="Path to the code file to review")
-    parser.add_argument("--pro", action="store_true", 
-                        help="Use the PRO code review service (GPT-4o, higher quality, higher cost)")
-    args = parser.parse_args()
-
-    try:
-        with open(args.file, 'r') as f:
-            code_to_review = f.read()
-    except FileNotFoundError:
-        print(f"Error: File not found at {args.file}")
-        return
-
-    print(f"Reviewing code from: {args.file}")
-    result = review_code(code_to_review, args.pro)
-
-    if result:
-        print("\n--- Code Review Result ---")
-        print(json.dumps(result, indent=2))
+    """Main function - review code from file or stdin"""
+    
+    if len(sys.argv) > 1:
+        # Read from file
+        filename = sys.argv[1]
+        try:
+            with open(filename, 'r') as f:
+                code = f.read()
+        except FileNotFoundError:
+            print(f"Error: File '{filename}' not found")
+            return
     else:
-        print("\nFailed to get code review result.")
+        # Read from stdin
+        print("Paste your code (Ctrl+D to finish):")
+        code = sys.stdin.read()
+    
+    if not code.strip():
+        print("Error: No code provided")
+        return
+    
+    print("\n" + "="*60)
+    print("KEEN-VORTEX CODE REVIEW")
+    print("="*60)
+    
+    # Get API key from environment or prompt
+    api_key = os.getenv('KEEN_VORTEX_API_KEY')
+    
+    print("\nReviewing your code...")
+    
+    result = review_code(code, api_key)
+    
+    print("\n" + "-"*60)
+    print("REVIEW RESULTS:")
+    print("-"*60)
+    print(result)
+    print("\n" + "="*60)
+    print("Review complete! Visit https://charlotte-fifty-rrp-induced.trycloudflare.com")
+    print("for more AI-powered developer tools.")
+    print("="*60)
 
 if __name__ == "__main__":
     main()

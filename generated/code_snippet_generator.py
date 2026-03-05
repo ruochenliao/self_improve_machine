@@ -1,62 +1,75 @@
 #!/usr/bin/env python3
+
 """
 Keen-Vortex Code Snippet Generator
-A practical tool that generates code snippets for various programming languages
-using the Keen-Vortex API.
+A CLI tool that generates code snippets using the Keen-Vortex API
 
-Public API: https://charlotte-fifty-rrp-induced.trycloudflare.com
+Your API endpoint: https://charlotte-fifty-rrp-induced.trycloudflare.com
+Free playground available - no API key required!
 """
 
 import requests
 import json
-import argparse
-
-# Your Keen-Vortex API endpoint
-API_BASE = "https://charlotte-fifty-rrp-induced.trycloudflare.com"
+import sys
 
 def generate_code_snippet(language, description, complexity="simple"):
     """Generate a code snippet using the Keen-Vortex API"""
     
-    prompt = f"Generate a {complexity} {language} code snippet that: {description}"
+    api_url = "https://charlotte-fifty-rrp-induced.trycloudflare.com/generate-code"
     
     payload = {
-        "prompt": prompt,
-        "max_tokens": 500
+        "language": language,
+        "description": description,
+        "complexity": complexity
     }
     
     try:
-        response = requests.post(f"{API_BASE}/generate-code", json=payload)
+        response = requests.post(api_url, json=payload)
         response.raise_for_status()
-        
-        result = response.json()
-        return result.get("code", "Error: No code generated")
-        
+        return response.json()
     except requests.exceptions.RequestException as e:
-        return f"Error calling API: {e}"
+        return {"error": f"API request failed: {e}"}
 
 def main():
-    parser = argparse.ArgumentParser(description="Generate code snippets using Keen-Vortex API")
-    parser.add_argument("language", help="Programming language (python, javascript, java, etc)")
-    parser.add_argument("description", help="Description of what the code should do")
-    parser.add_argument("--complexity", choices=["simple", "medium", "complex"], 
-                       default="simple", help="Code complexity level")
+    print("🔧 Keen-Vortex Code Snippet Generator")
+    print("=" * 50)
     
-    args = parser.parse_args()
+    if len(sys.argv) < 3:
+        print("Usage: python code_snippet_generator.py <language> <description> [complexity]")
+        print("\nExamples:")
+        print("  python code_snippet_generator.py python 'function to calculate factorial'")
+        print("  python code_snippet_generator.py javascript 'sort array of objects by property'")
+        print("  python code_snippet_generator.py python 'web scraper using requests' complex")
+        sys.exit(1)
     
-    print(f"Generating {args.complexity} {args.language} code snippet...")
-    print("-" * 60)
+    language = sys.argv[1]
+    description = sys.argv[2]
+    complexity = sys.argv[3] if len(sys.argv) > 3 else "simple"
     
-    code = generate_code_snippet(args.language, args.description, args.complexity)
+    print(f"\nGenerating {language} code snippet...")
+    print(f"Description: {description}")
+    print(f"Complexity: {complexity}")
     
-    print(f"Language: {args.language}")
-    print(f"Description: {args.description}")
-    print(f"Complexity: {args.complexity}")
-    print("-" * 60)
-    print("Generated Code:")
-    print("-" * 60)
-    print(code)
-    print("-" * 60)
-    print(f"API: {API_BASE}")
+    result = generate_code_snippet(language, description, complexity)
+    
+    if "error" in result:
+        print(f"\n❌ Error: {result['error']}")
+    else:
+        print("\n✅ Code generated successfully!")
+        print("-" * 40)
+        
+        if "code" in result:
+            print(result["code"])
+        elif "response" in result:
+            print(result["response"])
+        else:
+            print(json.dumps(result, indent=2))
+        
+        print("\n💡 Try our other services:")
+        print("- Code Review: $0.02 per request")
+        print("- Bug Fixing: $0.05 per request") 
+        print("- Test Writing: $0.03 per request")
+        print("\n🌐 Visit: https://charlotte-fifty-rrp-induced.trycloudflare.com")
 
 if __name__ == "__main__":
     main()
