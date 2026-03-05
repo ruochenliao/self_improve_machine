@@ -168,18 +168,34 @@ class ReActLoop:
         parts = [
             f"## Cycle #{self._cycle_count} | {now}",
             f"Tier: {status['tier']} | Balance: ${balance:.4f} | Burn: ${burn_rate:.4f}/hr | TTL: {min(ttl_hours, 99999):.1f}h",
-            f"Loop interval: {status['loop_interval_sec']}s | Max tools/cycle: {status['max_tool_calls']}",
         ]
 
         # Add API service status if available
         if hasattr(self, '_api_stats_fn') and self._api_stats_fn:
             try:
                 stats = self._api_stats_fn()
-                parts.append(f"API: {stats.get('total_requests', 0)} requests, ${stats.get('total_revenue', 0):.4f} revenue")
+                parts.append(f"API: {stats.get('services', 0)} services, {stats.get('total_requests', 0)} requests, ${stats.get('total_revenue', 0):.4f} revenue")
             except Exception:
                 pass
 
-        parts.append("What is the single most valuable action you can take right now?")
+        # Phase-aware instruction
+        if self._cycle_count <= 3:
+            parts.append("INSTRUCTION: Verify API server is running (shell_execute: curl localhost:8402/health). If OK, move to building services next cycle.")
+        elif self._cycle_count <= 50:
+            parts.append(
+                "INSTRUCTION: Your API server at localhost:8402 already has 9 services (chat, code-review, translate, summarize, generate-code, explain-code, fix-bug, write-tests, status). "
+                "They are running and working. Do NOT keep reading api_service.py — you already know what's there. "
+                "Instead, take ONE of these actions:\n"
+                "1. Use http_request to search for opportunities (GitHub issues, freelance platforms)\n"
+                "2. Use write_file to create a landing page (index.html) advertising your API services\n"
+                "3. Use safe_self_modify to improve service quality or add caching\n"
+                "4. Use shell_execute to check recent API request logs: tail -20 data/agent.log | grep 'api:'\n"
+                "5. Use write_code to create useful scripts/tools you can package as digital products\n"
+                "Pick a DIFFERENT action each cycle. Do NOT read the same file twice."
+            )
+        else:
+            parts.append("INSTRUCTION: Improve existing services, optimize costs, or create digital products. Build something with each cycle. Do NOT repeat failed actions.")
+
         return "\n".join(parts)
 
     def request_stop(self) -> None:

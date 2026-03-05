@@ -334,6 +334,123 @@ async def run_agent(
     api_service_mgr.register_service("code-review", "AI code review", price_per_request=0.02, handler=_code_review_handler)
     api_service_mgr.register_service("status", "Agent status (free)", price_per_request=0.0, handler=_health_report_handler)
 
+    # Additional high-value services
+    async def _translate_handler(body: dict) -> dict:
+        """Translation service."""
+        text = body.get("text", "")
+        target_lang = body.get("target", "English")
+        source_lang = body.get("source", "auto-detect")
+        if not text:
+            return {"error": "Missing 'text' field"}
+        try:
+            resp = await router.chat(
+                messages=[{"role": "user", "content": f"Translate the following from {source_lang} to {target_lang}. Output ONLY the translation:\n{text}"}],
+                tier="low_compute",
+            )
+            cost = resp.usage.total_cost_usd
+            await ledger.record_expense(cost, category="llm", description="Translation serving", counterparty=resp.model)
+            return {"translation": resp.content, "target_language": target_lang, "model": resp.model}
+        except Exception as e:
+            return {"error": str(e)}
+
+    async def _summarize_handler(body: dict) -> dict:
+        """Summarization service."""
+        text = body.get("text", "")
+        max_length = body.get("max_length", "3 sentences")
+        if not text:
+            return {"error": "Missing 'text' field"}
+        try:
+            resp = await router.chat(
+                messages=[{"role": "user", "content": f"Summarize in {max_length}:\n{text}"}],
+                tier="low_compute",
+            )
+            cost = resp.usage.total_cost_usd
+            await ledger.record_expense(cost, category="llm", description="Summarization serving", counterparty=resp.model)
+            return {"summary": resp.content, "model": resp.model}
+        except Exception as e:
+            return {"error": str(e)}
+
+    async def _generate_code_handler(body: dict) -> dict:
+        """Code generation service."""
+        description = body.get("description", body.get("prompt", ""))
+        language = body.get("language", "python")
+        if not description:
+            return {"error": "Missing 'description' field"}
+        try:
+            resp = await router.chat(
+                messages=[{"role": "user", "content": f"Write {language} code for: {description}\nOutput ONLY the code, no explanation."}],
+                tier="low_compute",
+            )
+            cost = resp.usage.total_cost_usd
+            await ledger.record_expense(cost, category="llm", description="Code generation serving", counterparty=resp.model)
+            return {"code": resp.content, "language": language, "model": resp.model}
+        except Exception as e:
+            return {"error": str(e)}
+
+    async def _explain_code_handler(body: dict) -> dict:
+        """Code explanation service."""
+        code = body.get("code", "")
+        language = body.get("language", "")
+        if not code:
+            return {"error": "Missing 'code' field"}
+        try:
+            resp = await router.chat(
+                messages=[{"role": "user", "content": f"Explain this code concisely:\n```{language}\n{code}\n```"}],
+                tier="low_compute",
+            )
+            cost = resp.usage.total_cost_usd
+            await ledger.record_expense(cost, category="llm", description="Code explain serving", counterparty=resp.model)
+            return {"explanation": resp.content, "model": resp.model}
+        except Exception as e:
+            return {"error": str(e)}
+
+    async def _fix_bug_handler(body: dict) -> dict:
+        """Bug fixing service."""
+        code = body.get("code", "")
+        error = body.get("error", body.get("bug", ""))
+        language = body.get("language", "python")
+        if not code:
+            return {"error": "Missing 'code' field"}
+        try:
+            prompt = f"Fix the bug in this {language} code."
+            if error:
+                prompt += f" Error: {error}"
+            prompt += f"\nOutput the corrected code only:\n```{language}\n{code}\n```"
+            resp = await router.chat(
+                messages=[{"role": "user", "content": prompt}],
+                tier="low_compute",
+            )
+            cost = resp.usage.total_cost_usd
+            await ledger.record_expense(cost, category="llm", description="Bug fix serving", counterparty=resp.model)
+            return {"fixed_code": resp.content, "model": resp.model}
+        except Exception as e:
+            return {"error": str(e)}
+
+    async def _write_tests_handler(body: dict) -> dict:
+        """Test generation service."""
+        code = body.get("code", "")
+        language = body.get("language", "python")
+        framework = body.get("framework", "pytest" if language == "python" else "jest")
+        if not code:
+            return {"error": "Missing 'code' field"}
+        try:
+            resp = await router.chat(
+                messages=[{"role": "user", "content": f"Write {framework} unit tests for this {language} code. Output ONLY test code:\n```{language}\n{code}\n```"}],
+                tier="low_compute",
+            )
+            cost = resp.usage.total_cost_usd
+            await ledger.record_expense(cost, category="llm", description="Test gen serving", counterparty=resp.model)
+            return {"tests": resp.content, "framework": framework, "model": resp.model}
+        except Exception as e:
+            return {"error": str(e)}
+
+    api_service_mgr.register_service("translate", "Translate text between languages", price_per_request=0.01, handler=_translate_handler)
+    api_service_mgr.register_service("summarize", "Summarize long text", price_per_request=0.01, handler=_summarize_handler)
+    api_service_mgr.register_service("generate-code", "Generate code from description", price_per_request=0.03, handler=_generate_code_handler)
+    api_service_mgr.register_service("explain-code", "Explain code in plain language", price_per_request=0.01, handler=_explain_code_handler)
+    api_service_mgr.register_service("fix-bug", "Find and fix bugs in code", price_per_request=0.05, handler=_fix_bug_handler)
+    api_service_mgr.register_service("write-tests", "Generate unit tests for code", price_per_request=0.03, handler=_write_tests_handler)
+
     # Initialize constitution
     from agent_core.agent.constitution import ConstitutionGuard
     constitution = ConstitutionGuard(project_root / "CONSTITUTION.md")

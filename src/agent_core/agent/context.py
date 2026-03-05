@@ -68,13 +68,25 @@ class ContextManager:
             if memories:
                 prompt_parts.append(MEMORY_PROMPT.format(memories=memories))
 
-        # Recent action history (last 5)
+        # Recent action history (last 5) with anti-repetition warning
         if self._action_history:
             recent = self._action_history[-5:]
             history_text = "## Recent Actions\n\n"
+
+            # Detect repeated failures
+            failed_actions = [h.get("action", "").split("(")[0] for h in recent if not h.get("success")]
+            repeated = set()
+            for a in failed_actions:
+                if failed_actions.count(a) >= 2:
+                    repeated.add(a)
+
             for h in recent:
                 status = "✓" if h.get("success") else "✗"
                 history_text += f"- [{status}] {h.get('action', 'unknown')}: {h.get('result', '')[:100]}\n"
+
+            if repeated:
+                history_text += f"\n⚠️ WARNING: You keep repeating failed action(s): {', '.join(repeated)}. STOP doing this. Try a completely different approach — build a new service, modify code, or create content.\n"
+
             prompt_parts.append(history_text)
 
         return "\n\n".join(prompt_parts)
