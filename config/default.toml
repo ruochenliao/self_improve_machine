@@ -64,15 +64,15 @@ vswitch_id = ""
 normal_threshold_usd = 100.0
 low_compute_threshold_usd = 5.0
 critical_threshold_usd = 0.50
-enable_react_loop = false  # 关闭高成本自主循环，仅保留低成本接单/API服务
+enable_react_loop = true  # 开启自主推理循环，让 Agent 自主进化
 
 [survival.intervals]
-normal_heartbeat_sec = 5
+normal_heartbeat_sec = 10
 low_compute_heartbeat_sec = 60
 critical_heartbeat_sec = 120
-normal_loop_sec = 10
-low_compute_loop_sec = 120
-critical_loop_sec = 300
+normal_loop_sec = 60       # 每分钟一个 cycle，节省 token
+low_compute_loop_sec = 300  # 钱少时 5 分钟一个 cycle
+critical_loop_sec = 600     # 危急时 10 分钟一个 cycle
 
 [survival.models]
 normal = ["claude-sonnet-4-20250514", "gpt-4o", "deepseek-chat"]

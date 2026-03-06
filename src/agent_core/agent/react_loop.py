@@ -15,6 +15,7 @@ from agent_core.agent.prompts import _get_tunnel_url
 if TYPE_CHECKING:
     from agent_core.agent.constitution import ConstitutionGuard
     from agent_core.agent.context import ContextManager
+    from agent_core.agent.goal_queue import GoalQueue
     from agent_core.economy.ledger import Ledger
     from agent_core.llm.router import ModelRouter
     from agent_core.memory.experience import ExperienceManager
@@ -38,6 +39,7 @@ class ReActLoop:
         experience_manager: ExperienceManager,
         ledger: Ledger,
         balance_monitor: "BalanceMonitor | None" = None,
+        goal_queue: "GoalQueue | None" = None,
     ) -> None:
         self._context = context_manager
         self._router = model_router
@@ -47,6 +49,7 @@ class ReActLoop:
         self._experience = experience_manager
         self._ledger = ledger
         self._balance_monitor = balance_monitor
+        self._goal_queue = goal_queue
         self._cycle_count = 0
         self._stop_event = asyncio.Event()
         self._current_tool_task: asyncio.Task | None = None
@@ -86,6 +89,15 @@ class ReActLoop:
         if self._balance_monitor:
             await self._balance_monitor.check()
 
+        # 0.5 GOAL MANAGEMENT: Pick up a goal if none in progress
+        current_goal = None
+        if self._goal_queue:
+            current_goal = self._goal_queue.get_in_progress()
+            if not current_goal:
+                current_goal = self._goal_queue.get_next_goal()
+                if current_goal:
+                    self._goal_queue.start_goal(current_goal.id)
+
         # 1. OBSERVE: Build context
         observation = self._build_observation()
         messages = self._context.get_messages(observation)
@@ -102,6 +114,7 @@ class ReActLoop:
         # 3. ACT: Execute tool calls
         max_calls = self._state_machine.get_current_config().max_tool_calls_per_cycle
         actions_taken = []
+        any_success = False
 
         if response.tool_calls:
             for i, tc in enumerate(response.tool_calls[:max_calls]):
@@ -120,6 +133,9 @@ class ReActLoop:
                 self._current_tool_task = asyncio.current_task()
                 result = await self._tools.execute(tc.name, tc.arguments)
                 self._current_tool_task = None
+
+                if result.success:
+                    any_success = True
 
                 actions_taken.append({
                     "action": f"{tc.name}({json.dumps(tc.arguments)[:100]})",
@@ -148,6 +164,23 @@ class ReActLoop:
                 cost_usd=total_cost / max(len(actions_taken), 1),
             )
 
+        # 4.5 GOAL UPDATE: Auto-complete/fail goals based on tool results
+        # Note: Agent can also explicitly call complete_goal/fail_goal tools
+        if current_goal and self._goal_queue:
+            # Check if agent explicitly completed/failed via tool call
+            goal_tool_used = any(
+                "complete_goal" in a["action"] or "fail_goal" in a["action"]
+                for a in actions_taken
+            )
+            if not goal_tool_used:
+                # If all actions succeeded, leave goal in_progress for next cycle
+                # If all actions failed, increment failure count
+                if actions_taken and not any_success:
+                    self._goal_queue.fail_goal(
+                        current_goal.id,
+                        f"All {len(actions_taken)} actions failed in cycle {self._cycle_count}",
+                    )
+
         elapsed = time.time() - cycle_start
         logger.info(
             "react_loop.cycle_end",
@@ -155,6 +188,7 @@ class ReActLoop:
             actions=len(actions_taken),
             cost=f"${total_cost:.6f}",
             elapsed=f"{elapsed:.2f}s",
+            goal=current_goal.id if current_goal else "none",
         )
 
     def _build_observation(self) -> str:
@@ -193,22 +227,28 @@ class ReActLoop:
         except Exception:
             pass
 
-        # Phase-aware instruction
-        if self._cycle_count <= 3:
-            parts.append("INSTRUCTION: Verify API server is running (shell_execute: curl localhost:8402/health). If OK, move to creating useful content next cycle.")
+        # Add goal queue status
+        if self._goal_queue:
+            parts.append(f"\n{self._goal_queue.get_status_summary()}")
+            current = self._goal_queue.get_in_progress()
+            if current:
+                parts.append(
+                    f"YOUR TASK: [{current.id}] {current.title}\n"
+                    f"  Details: {current.description}\n"
+                    f"  Attempt: {current.attempts}/{current.max_attempts}\n"
+                    f"  When done, call complete_goal(goal_id='{current.id}', result='...')\n"
+                    f"  If failed, call fail_goal(goal_id='{current.id}', reason='...')"
+                )
+            else:
+                parts.append("No pending goals. Use add_goal to create new objectives for yourself.")
+
+        # Phase-aware instruction (simplified since goals now drive behavior)
+        if self._cycle_count <= 2:
+            parts.append("\nFIRST BOOT: Focus on your current goal. Keep output SHORT to save tokens.")
         else:
             parts.append(
-                "INSTRUCTION: Your 14 API services are LIVE at "
-                f"{_get_tunnel_url()} . "
-                "FREE PLAYGROUND on landing page — zero friction!\n"
-                "REMEMBER: http_request to Reddit/HN/Twitter ALWAYS FAILS (needs OAuth). DO NOT TRY.\n"
-                "IMPORTANT: New files MUST go in generated/ directory (e.g., generated/my_tool.py).\n"
-                "Pick ONE action this cycle:\n"
-                "1. write_file: Create a useful tool/script in generated/ that uses your API\n"
-                "2. write_file: Create sample code in generated/ showing API integration\n"
-                "3. Improve your landing page or add a new API endpoint\n"
-                "4. If nothing useful to do, skip this cycle (output nothing, save tokens)\n"
-                "KEEP OUTPUT SHORT. Every token costs money."
+                "\nREMINDER: Keep output SHORT. Every token costs money. "
+                "Focus on your current goal. When done, call complete_goal and move to the next."
             )
 
         return "\n".join(parts)

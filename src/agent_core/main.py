@@ -351,6 +351,74 @@ async def run_agent(
     from agent_core.income.api_handlers import register_all_services
     register_all_services(api_service_mgr, router, ledger, state_machine)
 
+    # Initialize goal queue (autonomous task management)
+    from agent_core.agent.goal_queue import GoalQueue, GoalPriority
+    goal_queue = GoalQueue(data_dir)
+    await goal_queue.initialize()
+
+    # Register goal management tools so agent can manage its own goals
+    async def _add_goal(title: str, description: str, priority: str = "medium") -> ToolResult:
+        """Add a new goal to the agent's task queue."""
+        prio = GoalPriority(priority)
+        goal = goal_queue.add_goal(title, description, prio)
+        return ToolResult(success=True, output=f"Added goal '{goal.id}': {title}")
+
+    async def _complete_goal(goal_id: str, result: str = "") -> ToolResult:
+        """Mark a goal as completed."""
+        goal_queue.complete_goal(goal_id, result)
+        return ToolResult(success=True, output=f"Completed goal '{goal_id}'")
+
+    async def _fail_goal(goal_id: str, reason: str = "") -> ToolResult:
+        """Mark a goal as failed."""
+        goal_queue.fail_goal(goal_id, reason)
+        return ToolResult(success=True, output=f"Failed goal '{goal_id}': {reason}")
+
+    tool_registry.register(ToolEntry(
+        name="add_goal",
+        description="Add a new goal/task to your autonomous task queue. Use for self-directed planning.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "title": {"type": "string", "description": "Short goal title"},
+                "description": {"type": "string", "description": "What to do and how"},
+                "priority": {"type": "string", "enum": ["critical", "high", "medium", "low"], "description": "Goal priority"},
+            },
+            "required": ["title", "description"],
+        },
+        handler=_add_goal,
+        timeout_sec=5,
+    ))
+
+    tool_registry.register(ToolEntry(
+        name="complete_goal",
+        description="Mark a goal as completed after successfully finishing it.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "goal_id": {"type": "string", "description": "ID of the goal to complete"},
+                "result": {"type": "string", "description": "Brief result summary"},
+            },
+            "required": ["goal_id"],
+        },
+        handler=_complete_goal,
+        timeout_sec=5,
+    ))
+
+    tool_registry.register(ToolEntry(
+        name="fail_goal",
+        description="Mark a goal as failed (will retry if attempts remain).",
+        parameters={
+            "type": "object",
+            "properties": {
+                "goal_id": {"type": "string", "description": "ID of the goal that failed"},
+                "reason": {"type": "string", "description": "Why it failed"},
+            },
+            "required": ["goal_id"],
+        },
+        handler=_fail_goal,
+        timeout_sec=5,
+    ))
+
     # Initialize constitution
     from agent_core.agent.constitution import ConstitutionGuard
     constitution = ConstitutionGuard(project_root / "CONSTITUTION.md")
@@ -377,6 +445,7 @@ async def run_agent(
         experience_manager=experience_manager,
         ledger=ledger,
         balance_monitor=balance_monitor,
+        goal_queue=goal_queue,
     )
     react_loop._api_stats_fn = api_service_mgr.get_stats
 
