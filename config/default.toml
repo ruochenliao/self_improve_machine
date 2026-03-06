@@ -132,6 +132,13 @@ hard_stop_balance_usd = 0.10      # 硬止损余额
 reinvest_ratio = 0.50             # 利润中可回投算力比例
 block_free_trial_when_gated = false # 允许免费试用（获客成本）
 
+[ddns]
+enabled = true
+domain = "swifthelix.asia"
+rr = "@"  # "@" = root domain, "www" = www subdomain
+ttl = 600  # 10 minutes
+check_interval_sec = 300  # Check every 5 minutes
+
 [creator]
 # Creator revenue share configuration
 share_percentage = 30  # Creator gets 30% of all income

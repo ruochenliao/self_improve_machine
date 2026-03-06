@@ -489,6 +489,19 @@ async def run_agent(
     api_port = config.income.api_port
     api_server_task = asyncio.create_task(_start_api_server(api_service_mgr, port=api_port))
 
+    # Start DDNS daemon (auto-update DNS when MacBook IP changes)
+    ddns_task = None
+    if config.ddns.enabled:
+        try:
+            from agent_core.infrastructure.ddns import update_dns, ddns_daemon
+            result = update_dns(config.ddns.domain, config.ddns.rr, config.ddns.ttl)
+            logger.info("ddns.initial_update", **result)
+            ddns_task = asyncio.create_task(
+                ddns_daemon(config.ddns.domain, config.ddns.rr, config.ddns.check_interval_sec)
+            )
+        except Exception as e:
+            logger.warning("ddns.start_failed", error=str(e))
+
     # Run main loop (or pause loop to avoid idle token burn)
     final_snapshot: AgentSnapshot | None = None
     try:
@@ -527,6 +540,8 @@ async def run_agent(
         logger.info("agent.shutting_down")
         react_loop.request_stop()
         api_server_task.cancel()
+        if ddns_task:
+            ddns_task.cancel()
         await heartbeat.stop()
         await db.close()
         logger.info("agent.stopped", cycles=react_loop.cycle_count)

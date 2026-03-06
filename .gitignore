@@ -12,3 +12,6 @@ data/
 venv/
 _boot_test.py
 _debug_run.py
+
+# Secrets
+data/.secrets.env

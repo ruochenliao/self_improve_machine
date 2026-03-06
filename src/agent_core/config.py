@@ -168,6 +168,15 @@ class CreatorConfig(BaseModel):
     creator_account: str = ""
 
 
+class DDNSConfig(BaseModel):
+    """Dynamic DNS configuration for auto-updating domain when IP changes."""
+    enabled: bool = True
+    domain: str = "swifthelix.asia"
+    rr: str = "@"
+    ttl: int = 600
+    check_interval_sec: int = 300
+
+
 class AgentConfig(BaseSettings):
     """Root configuration model. Loads from TOML file + environment variables."""
 
@@ -185,6 +194,7 @@ class AgentConfig(BaseSettings):
     self_mod: SelfModConfig = Field(default_factory=SelfModConfig)
     creator: CreatorConfig = Field(default_factory=CreatorConfig)
     profit_gate: ProfitGateConfig = Field(default_factory=ProfitGateConfig)
+    ddns: DDNSConfig = Field(default_factory=DDNSConfig)
 
     model_config = {
         "env_prefix": "SIM_",
@@ -261,5 +271,9 @@ def _flatten_toml(data: dict[str, Any]) -> dict[str, Any]:
     # Profit gate config
     if "profit_gate" in data:
         result["profit_gate"] = data["profit_gate"]
+
+    # DDNS config
+    if "ddns" in data:
+        result["ddns"] = data["ddns"]
 
     return result
