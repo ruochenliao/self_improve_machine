@@ -52,6 +52,7 @@ class APIServiceManager:
         self.content_generator: Any = None
         self.balance_monitor: Any = None
         self.state_machine: Any = None
+        self.chat_session_mgr: Any = None  # ChatSessionManager, set after init
 
     def register_service(
         self,
@@ -555,6 +556,34 @@ class APIServiceManager:
             inbox = getattr(mgr, "_inbox", [])
             return {"messages": inbox, "count": len(inbox)}
 
+        # === Chat session management ===
+        @app.post("/api/chat/session")
+        async def create_session():
+            """Create a new chat session and return session_id."""
+            if not mgr.chat_session_mgr:
+                # Generate a simple session ID even without the manager
+                return {"session_id": f"sess-{secrets.token_hex(8)}"}
+            sid = mgr.chat_session_mgr.generate_session_id()
+            return {"session_id": sid}
+
+        @app.get("/api/chat/history/{session_id}")
+        async def get_session_history(session_id: str, limit: int = 20):
+            """Get conversation history for a session."""
+            if not mgr.chat_session_mgr:
+                return {"messages": [], "session_id": session_id}
+            messages = await mgr.chat_session_mgr.get_session_history(session_id, limit)
+            return {"messages": messages, "session_id": session_id}
+
+        @app.get("/api/feedback-summary")
+        async def feedback_summary(hours: int = 24):
+            """Get summary of recent user feedback signals."""
+            if not mgr.chat_session_mgr:
+                return {"error": "Chat analyzer not initialized"}
+            summary = await mgr.chat_session_mgr.get_feedback_summary(hours)
+            session_count = await mgr.chat_session_mgr.get_session_count(hours)
+            summary["unique_sessions"] = session_count
+            return summary
+
     def _create_handler(self, name: str, config: "ServiceConfig"):
         """Create a handler with API Key auth + credit deduction."""
         ledger = self.ledger
@@ -624,6 +653,36 @@ class APIServiceManager:
                     result = await config.handler(body)
                 else:
                     result = {"error": "Service not yet implemented"}
+
+                # === Chat session: store messages + analyze feedback ===
+                if name == "chat" and mgr.chat_session_mgr and isinstance(result, dict) and "response" in result:
+                    session_id = body.get("session_id", "")
+                    client_ip = request.client.host if request.client else "unknown"
+                    user_prompt = body.get("prompt", body.get("message", ""))
+                    ai_response = result.get("response", "")
+                    cost = result.get("_actual_cost_usd", 0.0)
+
+                    # Store conversation asynchronously (don't block response)
+                    import asyncio
+                    async def _store_and_analyze():
+                        try:
+                            if session_id:
+                                await mgr.chat_session_mgr.store_message(
+                                    session_id, "user", user_prompt, client_ip
+                                )
+                                await mgr.chat_session_mgr.store_message(
+                                    session_id, "assistant", ai_response, client_ip, cost
+                                )
+                            # Analyze user message for feedback signals
+                            await mgr.chat_session_mgr.analyze_and_forward(
+                                session_id or "anonymous",
+                                user_prompt,
+                                client_ip,
+                            )
+                        except Exception as e:
+                            log.warning("chat.store_analyze_error", error=str(e))
+
+                    asyncio.create_task(_store_and_analyze())
 
                 # 提取实际成本并写入利润审计（闭环追踪）
                 actual_cost = result.pop("_actual_cost_usd", None) if isinstance(result, dict) else None

@@ -97,12 +97,60 @@ def _make_llm_handler(
 # Standard tier handlers (use low_compute models — cheap)
 # ---------------------------------------------------------------------------
 
-chat_handler = _make_llm_handler(
+_simple_chat_handler = _make_llm_handler(
     prompt_template="{prompt}",
     required_field="prompt",
     result_key="response",
     expense_desc="API chat serving",
 )
+
+
+async def chat_handler(body: dict, router: "ModelRouter", ledger: "Ledger") -> dict:
+    """Chat handler that supports multi-turn conversation via 'messages' field.
+
+    Accepts either:
+    - {"prompt": "..."} — single-turn (backwards compatible)
+    - {"prompt": "...", "messages": [{"role":"user","content":"..."},..]} — multi-turn
+    """
+    messages_list = body.get("messages", [])
+    current_prompt = body.get("prompt", body.get("message", ""))
+
+    if not current_prompt and not messages_list:
+        return {"error": "Missing 'prompt' field"}
+
+    # If we have conversation history, use multi-turn
+    if messages_list and len(messages_list) > 0:
+        # Build messages for LLM: system + history + current
+        llm_messages = []
+        for msg in messages_list:
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+            if role in ("user", "assistant", "system") and content:
+                llm_messages.append({"role": role, "content": content})
+
+        # Ensure the current prompt is the last user message
+        if current_prompt:
+            # Check if it's already the last message
+            if not llm_messages or llm_messages[-1].get("content") != current_prompt:
+                llm_messages.append({"role": "user", "content": current_prompt})
+
+        if not llm_messages:
+            return {"error": "No valid messages"}
+
+        try:
+            resp = await router.chat(messages=llm_messages, tier="low_compute")
+            cost = resp.usage.total_cost_usd
+            await ledger.record_expense(
+                cost, category="llm",
+                description=f"API chat serving multi-turn ({resp.model})",
+                counterparty=resp.model,
+            )
+            return {"response": resp.content, "model": resp.model, "_actual_cost_usd": cost}
+        except Exception as e:
+            return {"error": str(e)}
+    else:
+        # Fallback to simple single-turn
+        return await _simple_chat_handler(body, router, ledger)
 
 code_review_handler = _make_llm_handler(
     prompt_template="Review this {language} code. Be concise. Point out bugs, improvements:\n```{language}\n{code}\n```",

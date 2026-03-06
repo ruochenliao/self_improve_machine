@@ -253,4 +253,33 @@ CREATE TABLE IF NOT EXISTS profit_audit (
 
 CREATE INDEX IF NOT EXISTS idx_profit_audit_ts ON profit_audit(timestamp);
 CREATE INDEX IF NOT EXISTS idx_profit_audit_service ON profit_audit(service);
+
+-- Chat sessions: user conversation history for multi-turn chat
+CREATE TABLE IF NOT EXISTS chat_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL,
+    client_ip TEXT NOT NULL DEFAULT '',
+    role TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system')),
+    content TEXT NOT NULL DEFAULT '',
+    cost_usd REAL NOT NULL DEFAULT 0.0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_chat_sessions_sid ON chat_sessions(session_id);
+CREATE INDEX IF NOT EXISTS idx_chat_sessions_ts ON chat_sessions(created_at);
+
+-- User feedback signals: extracted improvement suggestions from user conversations
+CREATE TABLE IF NOT EXISTS user_feedback (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL DEFAULT '',
+    client_ip TEXT NOT NULL DEFAULT '',
+    user_message TEXT NOT NULL DEFAULT '',
+    feedback_type TEXT NOT NULL DEFAULT 'general' CHECK (feedback_type IN ('bug_report', 'feature_request', 'complaint', 'suggestion', 'praise', 'general')),
+    priority TEXT NOT NULL DEFAULT 'low' CHECK (priority IN ('critical', 'high', 'medium', 'low')),
+    forwarded_to_agent INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_feedback_type ON user_feedback(feedback_type);
+CREATE INDEX IF NOT EXISTS idx_user_feedback_ts ON user_feedback(created_at);
 """

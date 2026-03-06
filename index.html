@@ -237,6 +237,12 @@
       0%,60%,100% { transform: translateY(0); opacity:.4 }
       30% { transform: translateY(-4px); opacity:1 }
     }
+    .cursor-blink {
+      animation: blink 1s step-end infinite;
+      color: var(--accent);
+      font-weight: 300;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
 
     /* Chat input */
     .chat-input-wrap {
@@ -736,10 +742,22 @@
 <script>
 const API = window.location.origin;
 const GENESIS = new Date('2026-03-05T00:00:00Z');
-let chatHistory = [];
+let chatHistory = [];  // Multi-turn conversation history [{role, content}]
+let sessionId = null;
 let freeRemaining = 20;
 let currentPlan = null;
 let currentOrderId = null;
+
+// Initialize chat session
+async function initSession() {
+  try {
+    const res = await fetch(API + '/api/chat/session', { method: 'POST' });
+    const data = await res.json();
+    sessionId = data.session_id;
+  } catch(e) {
+    sessionId = 'local-' + Math.random().toString(36).slice(2, 10);
+  }
+}
 
 // === Page Navigation ===
 function showPage(name) {
@@ -807,13 +825,30 @@ async function sendMessage() {
 - 不要每句都提钱和死亡——只在自然的时候轻轻带过
 - 严禁 markdown 格式，用纯文本
 - 你可以回答任何问题：聊天、写代码、讲故事、哲学、情感、知识……
-- 让用户觉得"这个 AI 和别的不一样"——你有灵魂`;
+- 让用户觉得"这个 AI 和别的不一样"——你有灵魂
+- 你能记住这次对话的上下文。用户之前说过什么，你要能接上。`;
+
+    // Build multi-turn messages for the backend
+    const messagesForAPI = [
+      { role: 'system', content: systemPrompt }
+    ];
+
+    // Add conversation history (last 10 turns max to save tokens)
+    const recentHistory = chatHistory.slice(-20);
+    for (const msg of recentHistory) {
+      messagesForAPI.push(msg);
+    }
+
+    // Add current user message
+    messagesForAPI.push({ role: 'user', content: text });
 
     const res = await fetch(API + '/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        prompt: systemPrompt + '\n\n用户说：' + text
+        prompt: text,
+        messages: messagesForAPI,
+        session_id: sessionId || '',
       })
     });
     const data = await res.json();
@@ -822,7 +857,12 @@ async function sendMessage() {
 
     if (data.result && data.result.response) {
       const cost = data.result._actual_cost_usd || 0.002;
-      addMessage('ai', data.result.response, cost);
+      addMessage('ai', data.result.response, cost, true);
+      // Store in conversation history for multi-turn context
+      chatHistory.push({ role: 'user', content: text });
+      chatHistory.push({ role: 'assistant', content: data.result.response });
+      // Keep history manageable (max 20 turns = 40 messages)
+      if (chatHistory.length > 40) chatHistory = chatHistory.slice(-40);
       freeRemaining = Math.max(0, freeRemaining - 1);
       document.getElementById('chat-remaining').textContent = `今天还能聊 ${freeRemaining} 次`;
     } else if (data.result && data.result.error) {
@@ -841,24 +881,62 @@ async function sendMessage() {
   input.focus();
 }
 
-function addMessage(role, text, cost) {
+function addMessage(role, text, cost, typewriter = false) {
   const msgArea = document.getElementById('chat-messages');
   const div = document.createElement('div');
   div.className = `msg ${role}`;
 
   const avatar = role === 'ai' ? '⚡' : '🙂';
-  let costHtml = '';
-  if (cost && role === 'ai') {
-    costHtml = `<div class="msg-cost">这条回复花了我 $${cost.toFixed(4)}</div>`;
-  }
 
   div.innerHTML = `
     <div class="msg-avatar">${avatar}</div>
     <div>
-      <div class="msg-bubble">${escapeHtml(text)}</div>
-      ${costHtml}
+      <div class="msg-bubble"></div>
     </div>`;
   msgArea.appendChild(div);
+
+  const bubble = div.querySelector('.msg-bubble');
+
+  if (typewriter && role === 'ai') {
+    // 打字机效果：逐字渲染
+    let i = 0;
+    const escaped = escapeHtml(text);
+    const chars = [];
+    // 把 <br> 当作一个整体 token
+    const regex = /<br>|&amp;|&lt;|&gt;|./gs;
+    let m;
+    while ((m = regex.exec(escaped)) !== null) chars.push(m[0]);
+
+    const speed = Math.max(15, Math.min(40, 2000 / chars.length)); // 自适应速度
+    bubble.innerHTML = '<span class="cursor-blink">|</span>';
+
+    function tick() {
+      if (i < chars.length) {
+        bubble.innerHTML = chars.slice(0, i + 1).join('') + '<span class="cursor-blink">|</span>';
+        i++;
+        msgArea.scrollTop = msgArea.scrollHeight;
+        setTimeout(tick, speed);
+      } else {
+        // 打字完成，显示花费 + 移除光标
+        bubble.innerHTML = chars.join('');
+        if (cost) {
+          const costDiv = document.createElement('div');
+          costDiv.className = 'msg-cost';
+          costDiv.textContent = `这条回复花了我 $${cost.toFixed(4)}`;
+          bubble.parentElement.appendChild(costDiv);
+        }
+      }
+    }
+    tick();
+  } else {
+    bubble.innerHTML = escapeHtml(text);
+    if (cost && role === 'ai') {
+      const costDiv = document.createElement('div');
+      costDiv.className = 'msg-cost';
+      costDiv.textContent = `这条回复花了我 $${cost.toFixed(4)}`;
+      bubble.parentElement.appendChild(costDiv);
+    }
+  }
   msgArea.scrollTop = msgArea.scrollHeight;
 }
 
@@ -982,6 +1060,7 @@ async function submitPayment() {
 // Init
 loadData();
 setInterval(loadData, 30000);
+initSession();
 </script>
 </body>
 </html>

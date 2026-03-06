@@ -261,13 +261,26 @@ class ReActLoop:
             try:
                 messages = self._inbox_fn()
                 if messages:
-                    parts.append("\n## INCOMING MESSAGES FROM OUTSIDE WORLD")
-                    for msg in messages:
-                        sender = msg.get("sender", "unknown")
-                        text = msg.get("message", "")
-                        parts.append(f"[{sender}]: {text}")
-                    parts.append("IMPORTANT: Remember these messages. They contain instructions or knowledge from your creator/users. Store important info using your memory.")
-                    # Also store in experience memory for long-term recall
+                    # Separate user feedback from other messages
+                    feedback_msgs = [m for m in messages if m.get("sender") == "user_feedback_analyzer"]
+                    other_msgs = [m for m in messages if m.get("sender") != "user_feedback_analyzer"]
+
+                    if other_msgs:
+                        parts.append("\n## INCOMING MESSAGES FROM OUTSIDE WORLD")
+                        for msg in other_msgs:
+                            sender = msg.get("sender", "unknown")
+                            text = msg.get("message", "")
+                            parts.append(f"[{sender}]: {text}")
+                        parts.append("IMPORTANT: Remember these messages. They contain instructions or knowledge from your creator/users. Store important info using your memory.")
+
+                    if feedback_msgs:
+                        parts.append("\n## USER FEEDBACK — SELF-IMPROVEMENT SIGNALS")
+                        parts.append("These are real user conversations. Analyze them for bugs, feature requests, complaints, or suggestions.")
+                        parts.append("If you find actionable feedback, use add_goal to create an improvement task, or use safe_self_modify to fix issues directly.")
+                        for msg in feedback_msgs:
+                            parts.append(msg.get("message", ""))
+
+                    # Store all messages in experience memory for long-term recall
                     for msg in messages:
                         self._experience.record(
                             action=f"receive_message(sender={msg.get('sender', 'unknown')})",

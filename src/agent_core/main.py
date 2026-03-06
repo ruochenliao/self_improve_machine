@@ -371,6 +371,13 @@ async def run_agent(
     api_service_mgr.balance_monitor = balance_monitor
     api_service_mgr.state_machine = state_machine
 
+    # Initialize chat session manager (conversation history + feedback analysis)
+    from agent_core.income.chat_analyzer import ChatSessionManager
+    if not hasattr(api_service_mgr, "_inbox"):
+        api_service_mgr._inbox = []
+    chat_session_mgr = ChatSessionManager(db=db, inbox_ref=api_service_mgr._inbox)
+    api_service_mgr.chat_session_mgr = chat_session_mgr
+
     # Register all API services (handlers defined in api_handlers.py)
     from agent_core.income.api_handlers import register_all_services
     register_all_services(api_service_mgr, router, ledger, state_machine)
