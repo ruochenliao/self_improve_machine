@@ -10,7 +10,7 @@ default_provider = "openai"
 api_key = "sk-gKpf4qNU3RD2zvQPCiwQmNRUwXM47mKPSO52Z2d5v5HuPkit"
 base_url = "https://api.closeai-asia.com/v1"
 models = [
-    "claude-opus-4-20250514",
+    "claude-opus-4-6",
     "claude-sonnet-4-20250514",
     "claude-haiku-4-5",
     "deepseek-chat",
@@ -79,8 +79,8 @@ critical_loop_sec = 600     # 危急时 10 分钟一个 cycle
 
 [survival.models]
 # 自我进化时优先用最强模型
-normal = ["claude-opus-4-20250514", "qwq-plus", "qwen3-max", "claude-sonnet-4-20250514", "deepseek-chat"]
-low_compute = ["qwq-plus", "claude-opus-4-20250514", "qwen3-max", "claude-sonnet-4-20250514", "deepseek-chat"]
+normal = ["claude-opus-4-6", "qwq-plus", "qwen3-max", "claude-sonnet-4-20250514", "deepseek-chat"]
+low_compute = ["qwq-plus", "claude-opus-4-6", "qwen3-max", "claude-sonnet-4-20250514", "deepseek-chat"]
 critical = ["qwen-plus", "deepseek-chat", "qwen-turbo"]
 
 [memory]
