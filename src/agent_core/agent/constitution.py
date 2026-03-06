@@ -89,10 +89,25 @@ class ConstitutionGuard:
                 return False, f"Action blocked: contains deceptive intent '{keyword}' (Constitution §3)"
 
         # Check if trying to modify constitution
-        if action_name in ("write_code", "write_file", "edit_code"):
-            file_path = str(action_args.get("file_path", "")).lower()
+        if action_name in ("write_code", "write_file", "edit_code",
+                           "safe_self_modify", "safe_edit_code"):
+            file_path = str(
+                action_args.get("file_path", action_args.get("path", ""))
+            ).lower()
             if "constitution" in file_path:
                 return False, "Action blocked: cannot modify CONSTITUTION.md"
+            if "soul.md" in file_path:
+                return False, "Action blocked: cannot modify SOUL.md"
+
+        # Extra guard for self-modification tools: warn on suspiciously short content
+        if action_name == "safe_self_modify":
+            new_content = action_args.get("new_content", "")
+            if len(new_content.strip()) < 50:
+                return False, (
+                    "Action blocked: safe_self_modify content is suspiciously short "
+                    f"({len(new_content.strip())} chars). This looks like a description, "
+                    "not actual file content."
+                )
 
         return True, ""
 

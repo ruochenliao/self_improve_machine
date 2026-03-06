@@ -30,10 +30,17 @@ class SmokeTestRunner:
         self.project_root = Path(project_root) if project_root else Path.cwd()
 
     async def run_import_test(self) -> SmokeTestResult:
-        """Test that all core modules can be imported."""
+        """Test that all core modules can be imported.
+
+        Uses dynamic discovery: scans src/agent_core for all .py files that
+        define real modules (not just __init__), then also checks a hardcoded
+        list of critical modules for safety.
+        """
         import time
         start = time.monotonic()
-        modules = [
+
+        # --- Critical modules that MUST always be tested ---
+        critical_modules = {
             "agent_core.config",
             "agent_core.storage.database",
             "agent_core.identity.identity",
@@ -47,7 +54,24 @@ class SmokeTestRunner:
             "agent_core.memory.vector_store",
             "agent_core.memory.rag",
             "agent_core.agent.react_loop",
-        ]
+            "agent_core.income.api_service",
+            "agent_core.income.api_handlers",
+            "agent_core.income.api_keys",
+        }
+
+        # --- Dynamic discovery: all .py under src/agent_core ---
+        discovered: set[str] = set()
+        agent_core_dir = self.project_root / "src" / "agent_core"
+        if agent_core_dir.is_dir():
+            for py_file in agent_core_dir.rglob("*.py"):
+                if py_file.name == "__init__.py":
+                    continue
+                # Convert path to module name
+                rel = py_file.relative_to(self.project_root / "src")
+                mod_name = str(rel.with_suffix("")).replace("/", ".").replace("\\", ".")
+                discovered.add(mod_name)
+
+        modules = sorted(critical_modules | discovered)
         errors: list[str] = []
         passed_count = 0
         for mod in modules:

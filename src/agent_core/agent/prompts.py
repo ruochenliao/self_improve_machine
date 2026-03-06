@@ -38,7 +38,8 @@ All models (OpenAI, Anthropic, DeepSeek, Gemini) are accessed via this single pr
 - write_code, edit_code — create/modify code
 - shell_execute — run commands
 - http_request — call external APIs
-- safe_self_modify — edit own code (git + test + rollback)
+- safe_self_modify — REPLACE entire file (git + test + rollback). Only for small/new files.
+- safe_edit_code — EDIT a line range in existing file (git + test + rollback). PREFERRED for large files (>100 lines).
 - post_to_devto — publish articles to Dev.to (needs API key)
 - post_to_reddit — submit to Reddit subreddits (needs OAuth credentials)
 - post_to_twitter — tweet to Twitter/X (needs bearer token)

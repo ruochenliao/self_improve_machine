@@ -253,17 +253,78 @@ async def run_agent(
 
     tool_registry.register(ToolEntry(
         name="safe_self_modify",
-        description="Safely modify your own source code. Changes are git-committed, smoke-tested, and auto-rolled back if tests fail. Use for self-improvement.",
+        description=(
+            "Safely REPLACE an entire source file. Content is validated (ast.parse, "
+            "shrinkage guard) before writing. Git-committed, smoke-tested, auto-rollback. "
+            "WARNING: You MUST provide the COMPLETE file content — not a summary or description. "
+            "For large files (>100 lines), prefer safe_edit_code instead."
+        ),
         parameters={
             "type": "object",
             "properties": {
                 "file_path": {"type": "string", "description": "Relative path from project root (e.g., 'src/agent_core/income/api_service.py')"},
-                "new_content": {"type": "string", "description": "Complete new file content"},
+                "new_content": {"type": "string", "description": "Complete new file content — MUST be valid Python code, NOT a description"},
                 "description": {"type": "string", "description": "Brief description of the change"},
             },
             "required": ["file_path", "new_content", "description"],
         },
         handler=_safe_self_modify,
+        timeout_sec=120,
+    ))
+
+    # Register safe_edit_code — partial modification (preferred for large files)
+    async def _safe_edit_code(
+        file_path: str, start_line: int, end_line: int,
+        new_content: str, description: str,
+    ) -> ToolResult:
+        """Safely edit a range of lines in a source file with git + smoke + rollback."""
+        target = self_modifier.project_root / file_path
+        if not target.exists():
+            return ToolResult(success=False, error=f"File not found: {file_path}")
+
+        original = target.read_text(encoding="utf-8")
+        lines = original.splitlines(keepends=True)
+        total = len(lines)
+
+        if start_line < 1 or end_line > total or start_line > end_line:
+            return ToolResult(
+                success=False,
+                error=f"Invalid line range {start_line}-{end_line} (file has {total} lines)",
+            )
+
+        # Build new full content from partial edit
+        new_lines = new_content.splitlines(keepends=True)
+        if new_content and not new_content.endswith("\n"):
+            new_lines[-1] += "\n"
+        result_lines = lines[:start_line - 1] + new_lines + lines[end_line:]
+        full_new = "".join(result_lines)
+
+        # Delegate to the validated modify_file path
+        result = await self_modifier.modify_file(file_path, full_new, description)
+        if result["success"]:
+            return ToolResult(success=True, output=f"Edited {file_path} lines {start_line}-{end_line}: {result['reason']}")
+        else:
+            return ToolResult(success=False, error=f"Failed: {result['reason']}")
+
+    tool_registry.register(ToolEntry(
+        name="safe_edit_code",
+        description=(
+            "Safely edit a LINE RANGE in a source file. PREFERRED over safe_self_modify for "
+            "large files. Only the specified lines are replaced; the rest of the file is kept. "
+            "Git-committed, smoke-tested, auto-rollback."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "file_path": {"type": "string", "description": "Relative path from project root"},
+                "start_line": {"type": "integer", "description": "Starting line number (1-based)"},
+                "end_line": {"type": "integer", "description": "Ending line number (1-based, inclusive)"},
+                "new_content": {"type": "string", "description": "New code to replace the specified line range"},
+                "description": {"type": "string", "description": "Brief description of the change"},
+            },
+            "required": ["file_path", "start_line", "end_line", "new_content", "description"],
+        },
+        handler=_safe_edit_code,
         timeout_sec=120,
     ))
 
