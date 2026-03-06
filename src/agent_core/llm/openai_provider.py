@@ -35,6 +35,7 @@ _PRICING = {
     "gpt-3.5-turbo": (0.50, 1.50),
     "gpt-4-turbo": (10.00, 30.00),
     # Claude via OpenAI-compatible proxy
+    "claude-opus-4-20250514": (15.00, 75.00),
     "claude-opus-4-6": (15.00, 75.00),
     "claude-opus-4-5": (15.00, 75.00),
     "claude-sonnet-4-6": (3.00, 15.00),
@@ -66,10 +67,18 @@ _PRICING = {
     "qwen-turbo-latest": (0.04, 0.08),
     "qwen-plus-latest": (0.11, 0.39),
     "qwen-max-latest": (0.56, 2.22),
+    # Qwen3 series
+    "qwen3-max": (0.56, 2.22),         # 千问3旗舰
+    "qwen3-coder-plus": (0.28, 1.11),  # 千问3代码专用
+    # QwQ reasoning models (stream-only)
+    "qwq-plus": (0.28, 1.11),          # ¥2.0/¥8.0 per 1M tokens
 }
 
 # Default fallback pricing for unknown models
 _DEFAULT_PRICING = (2.00, 8.00)
+
+# Models that require stream=True (DashScope limitation)
+_STREAM_ONLY_MODELS = {"qwq-plus", "qwq-plus-2025-03-05"}
 
 
 class OpenAIProvider(LLMProvider):
@@ -102,6 +111,10 @@ class OpenAIProvider(LLMProvider):
                 {"type": "function", "function": t} for t in tools
             ]
             kwargs["tool_choice"] = "auto"
+
+        # Some models (e.g. qwq-plus) only support stream mode
+        if self.model_name in _STREAM_ONLY_MODELS:
+            return await self._stream_chat(kwargs)
 
         response = await self._client.chat.completions.create(**kwargs)
         choice = response.choices[0]
@@ -142,6 +155,76 @@ class OpenAIProvider(LLMProvider):
             usage=usage,
             model=self.model_name,
             finish_reason=choice.finish_reason or "",
+        )
+
+    async def _stream_chat(self, kwargs: dict) -> LLMResponse:
+        """Stream-based chat for models that only support stream mode (e.g. qwq-plus)."""
+        kwargs["stream"] = True
+        kwargs["stream_options"] = {"include_usage": True}
+
+        content_parts: list[str] = []
+        tool_calls_map: dict[int, dict] = {}
+        finish_reason = ""
+        prompt_tokens = 0
+        completion_tokens = 0
+
+        async for chunk in await self._client.chat.completions.create(**kwargs):
+            if not chunk.choices and chunk.usage:
+                prompt_tokens = chunk.usage.prompt_tokens or 0
+                completion_tokens = chunk.usage.completion_tokens or 0
+                continue
+
+            if not chunk.choices:
+                continue
+
+            delta = chunk.choices[0].delta
+            if chunk.choices[0].finish_reason:
+                finish_reason = chunk.choices[0].finish_reason
+
+            if delta.content:
+                content_parts.append(delta.content)
+
+            if delta.tool_calls:
+                for tc in delta.tool_calls:
+                    idx = tc.index
+                    if idx not in tool_calls_map:
+                        tool_calls_map[idx] = {"id": tc.id or "", "name": "", "arguments": ""}
+                    if tc.id:
+                        tool_calls_map[idx]["id"] = tc.id
+                    if tc.function:
+                        if tc.function.name:
+                            tool_calls_map[idx]["name"] = tc.function.name
+                        if tc.function.arguments:
+                            tool_calls_map[idx]["arguments"] += tc.function.arguments
+
+        tool_calls: list[ToolCall] = []
+        for _idx in sorted(tool_calls_map.keys()):
+            tc_data = tool_calls_map[_idx]
+            try:
+                args = json.loads(tc_data["arguments"])
+            except (json.JSONDecodeError, TypeError):
+                args = {"raw": tc_data["arguments"]}
+            tool_calls.append(ToolCall(id=tc_data["id"], name=tc_data["name"], arguments=args))
+
+        usage = TokenUsage(
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            total_cost_usd=self.estimate_cost(prompt_tokens, completion_tokens),
+        )
+
+        logger.info(
+            "llm.openai.stream_chat",
+            model=self.model_name,
+            tokens=usage.total_tokens,
+            cost_usd=f"{usage.total_cost_usd:.6f}",
+        )
+
+        return LLMResponse(
+            content="".join(content_parts),
+            tool_calls=tool_calls,
+            usage=usage,
+            model=self.model_name,
+            finish_reason=finish_reason,
         )
 
     def estimate_cost(self, prompt_tokens: int, completion_tokens: int) -> float:

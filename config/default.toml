@@ -10,22 +10,25 @@ default_provider = "openai"
 api_key = "sk-gKpf4qNU3RD2zvQPCiwQmNRUwXM47mKPSO52Z2d5v5HuPkit"
 base_url = "https://api.closeai-asia.com/v1"
 models = [
+    "claude-opus-4-20250514",
+    "claude-sonnet-4-20250514",
+    "claude-haiku-4-5",
     "deepseek-chat",
     "gemini-2.5-flash",
     "gpt-4o-mini",
     "gpt-4o",
-    "claude-sonnet-4-20250514",
-    "claude-haiku-4-5",
-    "claude-3-5-haiku-latest",
 ]
 
 [llm.qwen]
 api_key = "sk-683c04db91314b1db8613b76420074ad"
 base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 models = [
-    "qwen-turbo",
+    "qwq-plus",
+    "qwen3-max",
+    "qwen-max-latest",
+    "qwen3-coder-plus",
     "qwen-plus",
-    "qwen-max",
+    "qwen-turbo",
 ]
 
 [llm.anthropic]
@@ -75,9 +78,10 @@ low_compute_loop_sec = 300  # 钱少时 5 分钟一个 cycle
 critical_loop_sec = 600     # 危急时 10 分钟一个 cycle
 
 [survival.models]
-normal = ["claude-sonnet-4-20250514", "gpt-4o", "deepseek-chat"]
-low_compute = ["claude-haiku-4-5", "deepseek-chat", "gemini-2.5-flash", "qwen-plus"]
-critical = ["deepseek-chat", "qwen-turbo"]
+# 自我进化时优先用最强模型
+normal = ["claude-opus-4-20250514", "qwq-plus", "qwen3-max", "claude-sonnet-4-20250514", "deepseek-chat"]
+low_compute = ["qwq-plus", "claude-opus-4-20250514", "qwen3-max", "claude-sonnet-4-20250514", "deepseek-chat"]
+critical = ["qwen-plus", "deepseek-chat", "qwen-turbo"]
 
 [memory]
 chromadb_path = "data/chromadb"
