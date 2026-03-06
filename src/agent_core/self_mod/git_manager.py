@@ -88,6 +88,32 @@ class GitManager:
         )
         return stdout if rc == 0 else ""
 
+    async def push(self, remote: str = "origin", branch: str = "master") -> bool:
+        """Push commits to remote. Returns True on success."""
+        rc, stdout, stderr = await self._run("push", remote, branch)
+        if rc != 0:
+            log.warning("git.push_failed", remote=remote, branch=branch, stderr=stderr)
+            return False
+        log.info("git.pushed", remote=remote, branch=branch)
+        return True
+
+    async def commit_and_push(self, message: str) -> dict:
+        """Stage all, commit, and push. Returns {committed, pushed, hash}."""
+        commit_hash = await self.commit_all(message)
+        if not commit_hash:
+            return {"committed": False, "pushed": False, "hash": None}
+        pushed = await self.push()
+        return {"committed": True, "pushed": pushed, "hash": commit_hash}
+
+    async def pull(self, remote: str = "origin", branch: str = "master") -> bool:
+        """Pull latest from remote. Returns True on success."""
+        rc, stdout, stderr = await self._run("pull", remote, branch)
+        if rc != 0:
+            log.warning("git.pull_failed", stderr=stderr)
+            return False
+        log.info("git.pulled", remote=remote, branch=branch)
+        return True
+
     async def stash(self) -> bool:
         """Stash current changes."""
         rc, _, _ = await self._run("stash", "push", "-m", "auto-stash before self-mod")

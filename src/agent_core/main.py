@@ -267,6 +267,30 @@ async def run_agent(
         timeout_sec=120,
     ))
 
+    # Register git commit+push tool (for non-source changes like generated/ files)
+    async def _git_commit_push(message: str) -> ToolResult:
+        """Git add all, commit, and push to remote origin."""
+        result = await git_manager.commit_and_push(message)
+        if not result["committed"]:
+            return ToolResult(success=True, output="Nothing to commit")
+        if result["pushed"]:
+            return ToolResult(success=True, output=f"Committed and pushed: {result['hash']}")
+        return ToolResult(success=True, output=f"Committed {result['hash']} but push failed (will retry next time)")
+
+    tool_registry.register(ToolEntry(
+        name="git_commit_push",
+        description="Stage all changes, commit with message, and push to GitHub. Use after writing files to persist your work.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "message": {"type": "string", "description": "Commit message describing the changes"},
+            },
+            "required": ["message"],
+        },
+        handler=_git_commit_push,
+        timeout_sec=60,
+    ))
+
     snapshot_mgr = SnapshotManager(data_dir / "snapshots")
     restarter = Restarter(snapshot_mgr)
 
@@ -448,6 +472,17 @@ async def run_agent(
         goal_queue=goal_queue,
     )
     react_loop._api_stats_fn = api_service_mgr.get_stats
+
+    # Connect inbox: external messages → ReAct observation
+    def _drain_inbox():
+        """Return and clear pending chat messages from API."""
+        inbox = getattr(api_service_mgr, "_inbox", [])
+        if inbox:
+            messages = list(inbox)
+            inbox.clear()
+            return messages
+        return []
+    react_loop.set_inbox_source(_drain_inbox)
 
     # Restore snapshot if requested
     if restore_snapshot:

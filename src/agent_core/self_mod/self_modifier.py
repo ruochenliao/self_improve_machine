@@ -116,6 +116,14 @@ class SelfModifier:
             success=attempt.success,
         )
 
+        # Auto-push successful modifications to remote
+        if attempt.success and not attempt.rolled_back:
+            pushed = await self.git.push()
+            if pushed:
+                log.info("self_mod.pushed", file=file_path)
+            else:
+                log.warning("self_mod.push_failed", file=file_path)
+
         return {
             "success": attempt.success,
             "rolled_back": attempt.rolled_back,
@@ -152,6 +160,14 @@ class SelfModifier:
             details={"module": module_path, "files": list(files.keys())},
             success=attempt.success,
         )
+
+        # Auto-push successful creations to remote
+        if attempt.success and not attempt.rolled_back:
+            pushed = await self.git.push()
+            if pushed:
+                log.info("self_mod.pushed", module=module_path)
+            else:
+                log.warning("self_mod.push_failed", module=module_path)
 
         return {
             "success": attempt.success,

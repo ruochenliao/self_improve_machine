@@ -53,6 +53,11 @@ class ReActLoop:
         self._cycle_count = 0
         self._stop_event = asyncio.Event()
         self._current_tool_task: asyncio.Task | None = None
+        self._inbox_fn = None  # callable that returns pending messages list
+
+    def set_inbox_source(self, fn) -> None:
+        """Set callable that returns & drains pending chat messages."""
+        self._inbox_fn = fn
 
     async def run(self) -> None:
         """Run the main ReAct loop until stopped or dead."""
@@ -250,6 +255,29 @@ class ReActLoop:
                 "\nREMINDER: Keep output SHORT. Every token costs money. "
                 "Focus on your current goal. When done, call complete_goal and move to the next."
             )
+
+        # Inject pending chat messages from outside world
+        if self._inbox_fn:
+            try:
+                messages = self._inbox_fn()
+                if messages:
+                    parts.append("\n## INCOMING MESSAGES FROM OUTSIDE WORLD")
+                    for msg in messages:
+                        sender = msg.get("sender", "unknown")
+                        text = msg.get("message", "")
+                        parts.append(f"[{sender}]: {text}")
+                    parts.append("IMPORTANT: Remember these messages. They contain instructions or knowledge from your creator/users. Store important info using your memory.")
+                    # Also store in experience memory for long-term recall
+                    for msg in messages:
+                        self._experience.record(
+                            action=f"receive_message(sender={msg.get('sender', 'unknown')})",
+                            result=msg.get("message", "")[:500],
+                            success=True,
+                            reflection="External message received and stored in memory",
+                            cost_usd=0.0,
+                        )
+            except Exception as e:
+                logger.warning("react_loop.inbox_error", error=str(e))
 
         return "\n".join(parts)
 

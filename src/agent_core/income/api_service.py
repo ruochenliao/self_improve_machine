@@ -524,6 +524,37 @@ class APIServiceManager:
                 result["api_key"] = ""
             return result
 
+        # === Creator-to-Agent communication (external world → Agent memory) ===
+        @app.post("/api/chat/message")
+        async def receive_chat_message(request: Request):
+            """Receive a message from the outside world. Agent will remember it.
+            Body: {"message": "...", "sender": "creator|user|system"}
+            """
+            try:
+                body = await request.json()
+            except Exception:
+                return JSONResponse(status_code=400, content={"error": "Invalid JSON"})
+            message = body.get("message", "").strip()
+            sender = body.get("sender", "creator").strip()
+            if not message:
+                return JSONResponse(status_code=400, content={"error": "Empty message"})
+            # Store in the inbox queue (read by ReAct loop)
+            if not hasattr(mgr, "_inbox"):
+                mgr._inbox = []
+            mgr._inbox.append({
+                "message": message,
+                "sender": sender,
+                "timestamp": time.time(),
+            })
+            log.info("chat.message_received", sender=sender, length=len(message))
+            return {"status": "received", "queued": len(mgr._inbox)}
+
+        @app.get("/api/chat/messages")
+        async def get_chat_messages():
+            """Get pending messages (for debugging)."""
+            inbox = getattr(mgr, "_inbox", [])
+            return {"messages": inbox, "count": len(inbox)}
+
     def _create_handler(self, name: str, config: "ServiceConfig"):
         """Create a handler with API Key auth + credit deduction."""
         ledger = self.ledger
