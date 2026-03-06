@@ -82,7 +82,7 @@ def _make_llm_handler(
                 description=f"{expense_desc} ({resp.model})",
                 counterparty=resp.model,
             )
-            result = {result_key: resp.content, "model": resp.model}
+            result = {result_key: resp.content, "model": resp.model, "_actual_cost_usd": cost}
             if extra_fields:
                 for k, v in extra_fields.items():
                     result[k] = body.get(v, fmt.get(v, ""))

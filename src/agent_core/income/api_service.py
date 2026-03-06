@@ -37,15 +37,21 @@ class APIServiceManager:
     - No key = free trial (limited requests per day)
     """
 
-    def __init__(self, ledger=None, http402_handler=None, api_key_mgr=None):
+    def __init__(self, ledger=None, http402_handler=None, api_key_mgr=None, profit_gate=None):
         self.ledger = ledger
         self.http402 = http402_handler
         self.api_key_mgr = api_key_mgr
+        self.profit_gate = profit_gate
         self.alipay_qr_url: str = ""
         self.wechat_qr_url: str = ""
         self.services: dict[str, ServiceConfig] = {}
         self._app = None
         self._free_trial_tracker: dict[str, list[float]] = {}  # ip -> [timestamps]
+        # Survival experiment modules (set externally after init)
+        self.survival_diary: Any = None
+        self.content_generator: Any = None
+        self.balance_monitor: Any = None
+        self.state_machine: Any = None
 
     def register_service(
         self,
@@ -217,11 +223,11 @@ class APIServiceManager:
         ledger = self.ledger
         mgr = self
 
-        # Pricing plans
+        # Pricing plans (China market, CNY)
         PLANS = {
-            "starter": {"price": 1.0, "credit": 1.0, "label": "Starter ($1)"},
-            "standard": {"price": 5.0, "credit": 5.0, "label": "Standard ($5)"},
-            "pro": {"price": 10.0, "credit": 10.0, "label": "Pro ($10)"},
+            "starter": {"price": 9.9, "credit": 9.9, "label": "入门版 (¥9.9)"},
+            "growth": {"price": 29.9, "credit": 32.0, "label": "增长版 (¥29.9，赠送¥2.1额度)"},
+            "pro": {"price": 99.0, "credit": 120.0, "label": "专业版 (¥99，赠送¥21额度)"},
         }
 
         @app.get("/api/balance")
@@ -266,6 +272,52 @@ class APIServiceManager:
                 "wechat_qr_url": mgr.wechat_qr_url,
             }
 
+        @app.get("/api/profit-dashboard")
+        async def profit_dashboard():
+            """飞轮看板：展示 Agent 经济指标（余额、毛利、再投资额度、门控状态）。"""
+            if mgr.profit_gate:
+                return await mgr.profit_gate.get_dashboard()
+            return {"error": "Profit gate not initialized"}
+
+        @app.get("/api/survival-status")
+        async def survival_status():
+            """Return current survival tier, balance, burn rate, and TTL."""
+            if mgr.balance_monitor:
+                status = await mgr.balance_monitor.check()
+                return status
+            if mgr.state_machine:
+                return mgr.state_machine.get_status()
+            return {"error": "Survival system not initialized"}
+
+        @app.get("/api/diary")
+        async def get_diary(limit: int = 10, offset: int = 0):
+            """Get survival diary entries."""
+            if not mgr.survival_diary:
+                return {"entries": [], "note": "Diary module not initialized"}
+            entries = await mgr.survival_diary.get_entries(limit=limit, offset=offset)
+            return {"entries": entries}
+
+        @app.post("/api/diary/generate")
+        async def generate_diary(request: Request):
+            """Generate today's diary entry (admin)."""
+            if not mgr.survival_diary:
+                return JSONResponse(status_code=501, content={"error": "Diary not initialized"})
+            try:
+                body = await request.json()
+            except Exception:
+                body = {}
+            date = body.get("date")
+            entry = await mgr.survival_diary.generate_daily_entry(date)
+            return entry
+
+        @app.get("/api/content")
+        async def get_content(date: str = ""):
+            """Get auto-generated social media content for a date."""
+            if not mgr.content_generator:
+                return {"error": "Content generator not initialized"}
+            content = await mgr.content_generator.generate_all(date or None)
+            return content
+
         @app.post("/api/purchase")
         async def create_purchase(request: Request):
             """Create a purchase order. User selects plan, provides email, gets order ID + payment instructions."""
@@ -303,13 +355,14 @@ class APIServiceManager:
                 "plan": plan_name,
                 "amount": plan["price"],
                 "credit": plan["credit"],
+                "currency": "CNY",
                 "payment_method": payment_method,
-                "instructions": f"Please transfer ${plan['price']:.2f} and include '{order_id}' in the payment note/memo. After payment, click 'I have paid' on the page.",
+                "instructions": f"请支付 ¥{plan['price']:.2f}，并在备注中填写订单号 {order_id}。支付后在页面提交付款凭证，系统人工核验通过后发放 API Key。",
             }
 
         @app.post("/api/purchase/confirm")
         async def confirm_purchase(request: Request):
-            """User confirms they have paid. Auto-generate API key immediately (trust-first model)."""
+            """User submits payment proof. No auto-approval; admin verification required."""
             try:
                 body = await request.json()
             except Exception:
@@ -324,51 +377,50 @@ class APIServiceManager:
             )
             if not row:
                 return JSONResponse(status_code=404, content={"error": "Order not found"})
+
             if row["status"] == "confirmed":
                 return {
                     "order_id": order_id,
                     "status": "confirmed",
                     "api_key": row["api_key"],
                     "credit": row["credit"],
-                    "message": "Order already confirmed. Here is your API key.",
+                    "message": "订单已确认，API Key 已发放。",
                 }
+
             if row["status"] != "pending":
                 return JSONResponse(status_code=400, content={
-                    "error": f"Order status is '{row['status']}', cannot confirm",
+                    "error": f"Order status is '{row['status']}', cannot submit payment proof",
                 })
 
-            # AUTO-APPROVE: Generate API key immediately (trust-first, verify later)
-            api_key = await api_key_mgr.create_key(
-                user_name=row["email"].split("@")[0],
-                email=row["email"],
-                initial_credit=row["credit"],
-                notes=f"Auto-approved purchase {order_id}, plan={row['plan']}",
+            payer_name = str(body.get("payer_name", "")).strip()
+            payment_channel = str(body.get("payment_channel", "")).strip() or row["payment_method"]
+            payment_reference = str(body.get("payment_reference", "")).strip()
+            paid_amount = body.get("paid_amount", row["amount"])
+
+            proof_note = (
+                f"[PAYMENT_PROOF] channel={payment_channel}; payer={payer_name}; "
+                f"amount={paid_amount}; ref={payment_reference}; submitted_at=now"
             )
+            merged_notes = f"{row['notes']}\n{proof_note}".strip()
 
             await api_key_mgr.db.execute(
                 """UPDATE purchase_orders
-                   SET status = 'confirmed', api_key = ?, confirmed_at = datetime('now')
+                   SET notes = ?
                    WHERE order_id = ?""",
-                (api_key, order_id),
+                (merged_notes, order_id),
             )
             await api_key_mgr.db.commit()
 
-            # Record income
-            if ledger:
-                await ledger.record_income(
-                    amount=row["amount"],
-                    category="api_key_sale",
-                    description=f"Auto-approved: {row['plan']} plan, order {order_id}",
-                    counterparty=row["email"],
-                )
-
-            log.info("purchase.auto_approved", order_id=order_id, credit=row["credit"])
+            log.info(
+                "purchase.proof_submitted",
+                order_id=order_id,
+                payment_channel=payment_channel,
+                paid_amount=paid_amount,
+            )
             return {
                 "order_id": order_id,
-                "status": "confirmed",
-                "api_key": api_key,
-                "credit": row["credit"],
-                "message": "Payment confirmed! Your API key is ready to use.",
+                "status": "pending",
+                "message": "已提交付款凭证，系统将在人工核验后发放 API Key。",
             }
 
         @app.post("/admin/orders/list")
@@ -516,10 +568,43 @@ class APIServiceManager:
                         )
 
                 body = await request.json()
+
+                # === 利润门控检查 ===
+                if mgr.profit_gate and config.price_per_request > 0:
+                    gate_decision = await mgr.profit_gate.check(
+                        is_paid=is_paid,
+                        price_per_request=config.price_per_request,
+                    )
+                    if not gate_decision["allowed"]:
+                        log.warning(
+                            "api_service.profit_gate_blocked",
+                            service=name,
+                            reason=gate_decision["reason"],
+                        )
+                        return JSONResponse(
+                            status_code=503,
+                            content={
+                                "error": "Service temporarily paused (cost control)",
+                                "reason": gate_decision["reason"],
+                            },
+                        )
+
                 if config.handler:
                     result = await config.handler(body)
                 else:
                     result = {"error": "Service not yet implemented"}
+
+                # 提取实际成本并写入利润审计（闭环追踪）
+                actual_cost = result.pop("_actual_cost_usd", None) if isinstance(result, dict) else None
+                if mgr.profit_gate and actual_cost is not None and is_paid:
+                    try:
+                        await mgr.profit_gate.record_actual(
+                            service=name,
+                            revenue=config.price_per_request,
+                            cost=actual_cost,
+                        )
+                    except Exception:
+                        pass  # 审计记录失败不阻断请求
 
                 # Deduct credit if paid user
                 if is_paid and api_key and api_key_mgr:

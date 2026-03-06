@@ -19,6 +19,15 @@ models = [
     "claude-3-5-haiku-latest",
 ]
 
+[llm.qwen]
+api_key = "sk-683c04db91314b1db8613b76420074ad"
+base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+models = [
+    "qwen-turbo",
+    "qwen-plus",
+    "qwen-max",
+]
+
 [llm.anthropic]
 # Not needed — Claude models are accessed via closeai-asia OpenAI-compatible proxy above
 api_key = ""
@@ -55,6 +64,7 @@ vswitch_id = ""
 normal_threshold_usd = 100.0
 low_compute_threshold_usd = 5.0
 critical_threshold_usd = 0.50
+enable_react_loop = false  # 关闭高成本自主循环，仅保留低成本接单/API服务
 
 [survival.intervals]
 normal_heartbeat_sec = 5
@@ -66,8 +76,8 @@ critical_loop_sec = 300
 
 [survival.models]
 normal = ["claude-sonnet-4-20250514", "gpt-4o", "deepseek-chat"]
-low_compute = ["claude-haiku-4-5", "deepseek-chat", "gemini-2.5-flash"]
-critical = ["deepseek-chat"]
+low_compute = ["claude-haiku-4-5", "deepseek-chat", "gemini-2.5-flash", "qwen-plus"]
+critical = ["deepseek-chat", "qwen-turbo"]
 
 [memory]
 chromadb_path = "data/chromadb"
@@ -110,6 +120,17 @@ access_secret = ""
 # [[social.webhooks]]
 # name = "slack"
 # url = "https://hooks.slack.com/services/..."
+
+[profit_gate]
+# 利润门控：Agent 自养活的铁律
+enabled = true
+require_confirmed_payment = true  # 必须确认收款才允许调用付费模型
+min_balance_usd = 0.50            # 余额低于此值停止所有付费调用
+min_gross_margin_ratio = 0.20     # 最低毛利率 20%
+max_cost_per_request_usd = 0.10   # 单次请求最大成本上限（约5000 tokens deepseek-chat）
+hard_stop_balance_usd = 0.10      # 硬止损余额
+reinvest_ratio = 0.50             # 利润中可回投算力比例
+block_free_trial_when_gated = false # 允许免费试用（获客成本）
 
 [creator]
 # Creator revenue share configuration

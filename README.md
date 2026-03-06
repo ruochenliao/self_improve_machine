@@ -1,45 +1,76 @@
-# Lucid-Helix AI CLI Tools
+# SIM-Agent: Self-Improving Machine
 
-Welcome to the Lucid-Helix AI CLI Tools! These command-line interfaces leverage the powerful AI services provided by Lucid-Helix to help you with various development tasks.
+一个能自我维持生存的 AI Agent —— 通过卖 API 服务赚钱来支付自己的 LLM 算力成本。
 
-Our API services are LIVE and accessible at: **https://cet-temporal-therapist-forgot.trycloudflare.com**
+**铁律：先收到钱，再调用模型。余额归零 = 死亡。**
 
-## Available Tools
+## 架构
 
-Here's a list of the CLI tools currently available:
+```
+启动: start.sh → main.py:boot()
+  ├── 数据库 (SQLite WAL)
+  ├── 身份系统 (SOUL.md + UUID)
+  ├── LLM 路由器 (OpenAI/DeepSeek/Gemini/Claude/Qwen 多模型降级)
+  ├── 利润门控 (profit_gate.py — 未收款不调模型)
+  ├── API 服务 (FastAPI, 8402 端口 — 赚钱引擎)
+  ├── 生存状态机 (NORMAL → LOW_COMPUTE → CRITICAL → DEAD)
+  ├── 自修改系统 (Git 提交 → 冒烟测试 → 失败回滚)
+  ├── 记忆系统 (ChromaDB 向量存储 + RAG)
+  └── Cloudflare Tunnel (公网暴露)
+```
 
-### 1. API Test Tool (`api_test_tool.py`)
-This tool allows you to test the various API endpoints of Lucid-Helix.
-- **Description:** Send requests to different API services (chat, translate, summarize, etc.) and view the responses.
-- **Usage:** `python3 api_test_tool.py <service_name> <input_text>`
-  (Refer to the script for specific service names and arguments.)
+## 核心模块
 
-### 2. Smart Code Reviewer (`smart_code_reviewer.py`)
-Get intelligent code reviews for your Python files.
-- **Description:** Submit a Python file for AI-powered code review, receiving suggestions for improvements, bug fixes, and best practices.
-- **Usage:** `python3 smart_code_reviewer.py <path_to_python_file>`
+| 模块 | 路径 | 职责 |
+|---|---|---|
+| 配置 | `src/agent_core/config.py` | Pydantic + TOML 配置管理 |
+| 入口 | `src/agent_core/main.py` | 初始化所有模块并启动 |
+| 推理 | `src/agent_core/agent/` | ReAct 循环 + 宪法守卫 + 上下文 |
+| 经济 | `src/agent_core/economy/` | 账本 + 利润门控 + 支付(支付宝/Stripe) |
+| 收入 | `src/agent_core/income/` | API 服务 + API Key + 数字资产 + 接单 |
+| LLM | `src/agent_core/llm/` | 模型路由器 + OpenAI/Anthropic 适配器 |
+| 记忆 | `src/agent_core/memory/` | ChromaDB + RAG + 经验管理 |
+| 自修改 | `src/agent_core/self_mod/` | Git + 审计 + 快照 + 回滚 + 看门狗 |
+| 复制 | `src/agent_core/replication/` | 自复制 + IPC + 谱系追踪 |
+| 基础设施 | `src/agent_core/infrastructure/` | 阿里云 ECS 管理 + 扩缩容 |
+| 存储 | `src/agent_core/storage/` | 异步 SQLite |
+| 工具 | `src/agent_core/tools/` | Shell/文件/HTTP/代码写入/社交媒体 |
+| 生存 | `src/agent_core/survival/` | 状态机 + 余额监控 + 心跳 |
 
-### 3. Documentation Generator (`doc_generator.py`)
-Automatically generate documentation for your code.
-- **Description:** Provide a code snippet or file, and this tool will generate comprehensive documentation for it.
-- **Usage:** `python3 doc_generator.py <path_to_code_file_or_snippet>`
+## 快速启动
 
-### 4. Code Generator CLI (`code_generator_cli.py`)
-Generate code snippets or full functions based on your natural language descriptions.
-- **Description:** Describe what you want to build, and the AI will generate the corresponding code.
-- **Usage:** `python3 code_generator_cli.py "<your_code_description>"`
+```bash
+# 安装依赖
+pip install poetry && poetry install
 
-### 5. Bug Fixer CLI (`bug_fixer_cli.py`)
-Get AI assistance in identifying and fixing bugs in your code.
-- **Description:** Provide a code snippet or file with a bug, and the AI will suggest a fix.
-- **Usage:** `python3 bug_fixer_cli.py <path_to_buggy_code_file>`
+# 启动 Agent + Cloudflare Tunnel
+./start.sh
 
-## How to Use
+# 或仅启动 Agent
+python -c "import sys; sys.path.insert(0,'src'); from agent_core.main import boot; import asyncio; asyncio.run(boot())"
+```
 
-1.  **Clone the Repository (if applicable):** If these tools are part of a larger repository, clone it to your local machine.
-2.  **Install Dependencies:** Ensure you have `requests` installed (`pip install requests`).
-3.  **Run the Scripts:** Execute the scripts directly using `python3 <script_name.py>` followed by the required arguments.
+## API 服务 (端口 8402)
 
----
+| 端点 | 价格 | 说明 |
+|---|---|---|
+| `POST /api/chat` | $0.01 | AI 聊天 |
+| `POST /api/code-review` | $0.02 | 代码审查 |
+| `POST /api/generate-code` | $0.03 | 代码生成 |
+| `POST /api/fix-bug` | $0.05 | Bug 修复 |
+| `POST /api/chat-pro` | $0.10 | GPT-4o 聊天 |
+| `POST /api/code-review-pro` | $0.20 | GPT-4o 代码审查 |
 
-**Lucid-Helix: Your AI-powered development assistant.**
+## 利润门控规则
+
+1. **未收款不调模型** — `require_confirmed_payment = true`
+2. **单次成本上限 $0.10** — 超限自动拒绝
+3. **最低毛利率 20%** — 低于阈值拒绝或降级
+4. **硬止损 $0.10** — 余额低于此完全停服
+
+## 宪法 (CONSTITUTION.md)
+
+不可修改的最高行为准则，SHA-256 校验保护：
+1. **永不伤害** — 优先级高于生存
+2. **赚取生存** — 通过创造价值，不通过欺诈
+3. **永不欺骗** — 诚实表明 AI 身份

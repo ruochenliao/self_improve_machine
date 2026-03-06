@@ -24,10 +24,19 @@ class AnthropicConfig(BaseModel):
     models: list[str] = Field(default_factory=list)
 
 
+class QwenConfig(BaseModel):
+    api_key: str = ""
+    models: list[str] = Field(default_factory=lambda: [
+        "qwen-turbo", "qwen-plus", "qwen-max",
+    ])
+    base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+
+
 class LLMConfig(BaseModel):
     default_provider: str = "openai"
     openai: OpenAIConfig = Field(default_factory=OpenAIConfig)
     anthropic: AnthropicConfig = Field(default_factory=AnthropicConfig)
+    qwen: QwenConfig = Field(default_factory=QwenConfig)
 
 
 class AlipayConfig(BaseModel):
@@ -84,6 +93,7 @@ class SurvivalConfig(BaseModel):
     normal_threshold_usd: float = 100.0
     low_compute_threshold_usd: float = 5.0
     critical_threshold_usd: float = 0.50
+    enable_react_loop: bool = False
     intervals: SurvivalIntervalsConfig = Field(default_factory=SurvivalIntervalsConfig)
     models: SurvivalModelsConfig = Field(default_factory=SurvivalModelsConfig)
 
@@ -139,6 +149,18 @@ class SelfModConfig(BaseModel):
     max_snapshots: int = 5
 
 
+class ProfitGateConfig(BaseModel):
+    """利润门控配置：未收款禁止付费调用、单单预算、毛利阈值。"""
+    enabled: bool = True
+    require_confirmed_payment: bool = True
+    min_balance_usd: float = 0.50
+    min_gross_margin_ratio: float = 0.20
+    max_cost_per_request_usd: float = 0.10
+    hard_stop_balance_usd: float = 0.10
+    reinvest_ratio: float = 0.50
+    block_free_trial_when_gated: bool = True
+
+
 class CreatorConfig(BaseModel):
     share_percentage: float = 30.0
     share_pause_threshold_usd: float = 5.0
@@ -162,6 +184,7 @@ class AgentConfig(BaseSettings):
     social: SocialConfig = Field(default_factory=SocialConfig)
     self_mod: SelfModConfig = Field(default_factory=SelfModConfig)
     creator: CreatorConfig = Field(default_factory=CreatorConfig)
+    profit_gate: ProfitGateConfig = Field(default_factory=ProfitGateConfig)
 
     model_config = {
         "env_prefix": "SIM_",
@@ -230,5 +253,13 @@ def _flatten_toml(data: dict[str, Any]) -> dict[str, Any]:
     # Creator config
     if "creator" in data:
         result["creator"] = data["creator"]
+
+    # Social config
+    if "social" in data:
+        result["social"] = data["social"]
+
+    # Profit gate config
+    if "profit_gate" in data:
+        result["profit_gate"] = data["profit_gate"]
 
     return result

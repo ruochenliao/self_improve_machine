@@ -58,6 +58,14 @@ _PRICING = {
     # Grok
     "grok-3-beta": (3.00, 15.00),
     "grok-3-mini-beta": (0.30, 0.50),
+    # 通义千问 Qwen (DashScope, CNY→USD ≈ /7.2)
+    "qwen-turbo": (0.04, 0.08),       # ¥0.3/¥0.6 per 1M tokens
+    "qwen-plus": (0.11, 0.39),        # ¥0.8/¥2.0 per 1M tokens (free until 2026 年某日)
+    "qwen-max": (0.56, 2.22),         # ¥4.0/¥16.0 per 1M tokens
+    "qwen-long": (0.07, 0.28),        # ¥0.5/¥2.0 per 1M tokens
+    "qwen-turbo-latest": (0.04, 0.08),
+    "qwen-plus-latest": (0.11, 0.39),
+    "qwen-max-latest": (0.56, 2.22),
 }
 
 # Default fallback pricing for unknown models

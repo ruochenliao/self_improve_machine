@@ -196,6 +196,18 @@ CREATE TABLE IF NOT EXISTS purchase_orders (
     notes TEXT NOT NULL DEFAULT ''
 );
 
+-- Promotion log: social media promotion history
+CREATE TABLE IF NOT EXISTS promotion_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp TEXT NOT NULL DEFAULT (datetime('now')),
+    platform TEXT NOT NULL DEFAULT '',
+    content_type TEXT NOT NULL DEFAULT '',
+    title TEXT NOT NULL DEFAULT '',
+    url TEXT NOT NULL DEFAULT '',
+    success INTEGER NOT NULL DEFAULT 1,
+    error TEXT NOT NULL DEFAULT ''
+);
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_purchase_orders_id ON purchase_orders(order_id);
 CREATE INDEX IF NOT EXISTS idx_purchase_orders_status ON purchase_orders(status);
@@ -212,4 +224,33 @@ CREATE INDEX IF NOT EXISTS idx_api_keys_key ON api_keys(api_key);
 CREATE INDEX IF NOT EXISTS idx_api_key_usage_key ON api_key_usage(api_key);
 CREATE INDEX IF NOT EXISTS idx_promotion_log_platform ON promotion_log(platform);
 CREATE INDEX IF NOT EXISTS idx_promotion_log_timestamp ON promotion_log(timestamp);
+
+-- Profit gate audit log: 利润门控决策审计
+CREATE TABLE IF NOT EXISTS profit_gate_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp TEXT NOT NULL DEFAULT (datetime('now')),
+    action TEXT NOT NULL DEFAULT '',
+    reason TEXT NOT NULL DEFAULT '',
+    estimated_cost REAL NOT NULL DEFAULT 0.0,
+    estimated_revenue REAL NOT NULL DEFAULT 0.0,
+    estimated_margin REAL NOT NULL DEFAULT 0.0,
+    balance REAL NOT NULL DEFAULT 0.0
+);
+
+CREATE INDEX IF NOT EXISTS idx_profit_gate_log_ts ON profit_gate_log(timestamp);
+CREATE INDEX IF NOT EXISTS idx_profit_gate_log_action ON profit_gate_log(action);
+
+-- Profit audit: 实际收入/成本/毛利追踪（每笔完成的请求）
+CREATE TABLE IF NOT EXISTS profit_audit (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp TEXT NOT NULL DEFAULT (datetime('now')),
+    service TEXT NOT NULL DEFAULT '',
+    revenue REAL NOT NULL DEFAULT 0.0,
+    cost REAL NOT NULL DEFAULT 0.0,
+    margin REAL NOT NULL DEFAULT 0.0,
+    balance REAL NOT NULL DEFAULT 0.0
+);
+
+CREATE INDEX IF NOT EXISTS idx_profit_audit_ts ON profit_audit(timestamp);
+CREATE INDEX IF NOT EXISTS idx_profit_audit_service ON profit_audit(service);
 """

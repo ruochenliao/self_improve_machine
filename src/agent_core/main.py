@@ -108,6 +108,18 @@ async def run_agent(
             )
             router.register_provider(provider)
 
+    # 通义千问（DashScope OpenAI-compatible）
+    if config.llm.qwen.api_key:
+        from agent_core.llm.openai_provider import OpenAIProvider as QwenProvider
+        for model in config.llm.qwen.models:
+            provider = QwenProvider(
+                api_key=config.llm.qwen.api_key,
+                model_name=model,
+                base_url=config.llm.qwen.base_url,
+            )
+            provider.provider_name = "qwen"
+            router.register_provider(provider)
+
     router.configure_from_config(config)
 
     # Initialize tools
@@ -160,6 +172,7 @@ async def run_agent(
     http_client.set_http402_handler(http402_handler)
 
     # Configure social media promotion tools
+    from agent_core.tools import social_media
     social_cfg = {
         "devto": {"api_key": config.social.devto.api_key},
         "reddit": {
@@ -303,10 +316,36 @@ async def run_agent(
         freelance_mgr.register_platform(github_platform)
 
     api_key_mgr = APIKeyManager(db=db)
-    api_service_mgr = APIServiceManager(ledger=ledger, http402_handler=http402_handler, api_key_mgr=api_key_mgr)
+    # 初始化利润门控
+    from agent_core.economy.profit_gate import ProfitGate
+    profit_gate = ProfitGate(
+        config=config.profit_gate,
+        ledger=ledger,
+        db=db,
+    )
+    api_service_mgr = APIServiceManager(
+        ledger=ledger,
+        http402_handler=http402_handler,
+        api_key_mgr=api_key_mgr,
+        profit_gate=profit_gate,
+    )
     api_service_mgr.alipay_qr_url = config.income.alipay_qr_url
     api_service_mgr.wechat_qr_url = config.income.wechat_qr_url
     digital_store = DigitalAssetStore(db=db, ledger=ledger)
+
+    # Initialize survival diary and content generator (AI Survival Experiment)
+    from agent_core.income.survival_diary import SurvivalDiary
+    from agent_core.income.content_generator import ContentGenerator
+
+    survival_diary = SurvivalDiary(db=db, ledger=ledger, state_machine=state_machine)
+    await survival_diary.init_tables()
+    content_generator = ContentGenerator(diary=survival_diary)
+
+    # Attach experiment modules to API service manager
+    api_service_mgr.survival_diary = survival_diary
+    api_service_mgr.content_generator = content_generator
+    api_service_mgr.balance_monitor = balance_monitor
+    api_service_mgr.state_machine = state_machine
 
     # Register all API services (handlers defined in api_handlers.py)
     from agent_core.income.api_handlers import register_all_services
@@ -381,7 +420,8 @@ async def run_agent(
     api_port = config.income.api_port
     api_server_task = asyncio.create_task(_start_api_server(api_service_mgr, port=api_port))
 
-    # Run main loop
+    # Run main loop (or pause loop to avoid idle token burn)
+    final_snapshot: AgentSnapshot | None = None
     try:
         generation = lineage.current.generation if lineage.current else 0
         logger.info(
@@ -389,8 +429,16 @@ async def run_agent(
             name=identity.name,
             instance=lineage.current.instance_id if lineage.current else "unknown",
             generation=generation,
+            react_loop_enabled=config.survival.enable_react_loop,
         )
-        await react_loop.run()
+        if config.survival.enable_react_loop:
+            await react_loop.run()
+        else:
+            logger.warning(
+                "agent.react_loop_disabled",
+                reason="survival.enable_react_loop=false",
+            )
+            await shutdown_event.wait()
     except KeyboardInterrupt:
         logger.info("agent.keyboard_interrupt")
     finally:
@@ -415,7 +463,7 @@ async def run_agent(
         logger.info("agent.stopped", cycles=react_loop.cycle_count)
 
         # If restart was requested, do it now
-        if restarter.restart_pending:
+        if restarter.restart_pending and final_snapshot is not None:
             await restarter.graceful_restart(final_snapshot)
 
 
