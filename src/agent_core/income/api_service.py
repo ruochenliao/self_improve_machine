@@ -53,6 +53,22 @@ class APIServiceManager:
         self.balance_monitor: Any = None
         self.state_machine: Any = None
         self.chat_session_mgr: Any = None  # ChatSessionManager, set after init
+        # Alipay payment integration
+        self.alipay_payment = None
+        self._init_alipay()
+
+    def _init_alipay(self):
+        """Initialize Alipay payment if config is available."""
+        try:
+            from .alipay_payment import AlipayPayment
+            self.alipay_payment = AlipayPayment()
+            if self.alipay_payment.is_configured:
+                log.info("api_service.alipay_initialized")
+            else:
+                log.info("api_service.alipay_not_configured", hint="Set ALIPAY_* env vars")
+        except Exception as e:
+            log.warning("api_service.alipay_init_error", error=str(e))
+            self.alipay_payment = None
 
     def register_service(
         self,
@@ -321,7 +337,7 @@ class APIServiceManager:
 
         @app.post("/api/purchase")
         async def create_purchase(request: Request):
-            """Create a purchase order. User selects plan, provides email, gets order ID + payment instructions."""
+            """Create a purchase order with Alipay QR code (or fallback to manual)."""
             try:
                 body = await request.json()
             except Exception:
@@ -351,6 +367,23 @@ class APIServiceManager:
                 await api_key_mgr.db.commit()
 
             log.info("purchase.created", order_id=order_id, plan=plan_name, email=email)
+
+            # Try Alipay precreate for dynamic QR code
+            alipay_qr = ""
+            if mgr.alipay_payment and mgr.alipay_payment.is_configured:
+                from .alipay_payment import _format_amount
+                result = mgr.alipay_payment.precreate(
+                    out_trade_no=order_id,
+                    total_amount=_format_amount(plan["price"]),
+                    subject=f"Swift-Helix {plan['label']}",
+                    timeout_express="30m",
+                )
+                if result.get("success"):
+                    alipay_qr = result["qr_code"]
+                    log.info("purchase.alipay_qr_created", order_id=order_id, qr=alipay_qr[:50])
+                else:
+                    log.warning("purchase.alipay_precreate_failed", error=result.get("error"))
+
             return {
                 "order_id": order_id,
                 "plan": plan_name,
@@ -358,8 +391,131 @@ class APIServiceManager:
                 "credit": plan["credit"],
                 "currency": "CNY",
                 "payment_method": payment_method,
-                "instructions": f"请支付 ¥{plan['price']:.2f}，并在备注中填写订单号 {order_id}。支付后在页面提交付款凭证，系统人工核验通过后发放 API Key。",
+                "alipay_qr": alipay_qr,
+                "payment_mode": "alipay_auto" if alipay_qr else "manual",
+                "instructions": (
+                    f"请使用支付宝扫码支付 ¥{plan['price']:.2f}，支付完成后系统自动确认。"
+                    if alipay_qr else
+                    f"请支付 ¥{plan['price']:.2f}，并在备注中填写订单号 {order_id}。支付后在页面提交付款凭证，系统人工核验通过后发放 API Key。"
+                ),
             }
+
+        @app.post("/api/alipay/notify")
+        async def alipay_notify(request: Request):
+            """Alipay async payment notification callback.
+
+            Alipay POSTs here after user pays. We verify signature, confirm order, issue API key.
+            MUST return plain text "success" to acknowledge.
+            """
+            from fastapi.responses import PlainTextResponse
+
+            try:
+                form_data = await request.form()
+                params = {k: v for k, v in form_data.items()}
+            except Exception:
+                return PlainTextResponse("fail")
+
+            log.info("alipay.notify_received", trade_no=params.get("trade_no", ""), out_trade_no=params.get("out_trade_no", ""))
+
+            # Verify signature
+            if not mgr.alipay_payment or not mgr.alipay_payment.verify_notify(params):
+                log.error("alipay.notify_verify_failed")
+                return PlainTextResponse("fail")
+
+            trade_status = params.get("trade_status", "")
+            out_trade_no = params.get("out_trade_no", "")
+            trade_no = params.get("trade_no", "")
+            buyer_logon_id = params.get("buyer_logon_id", "")
+            total_amount = params.get("total_amount", "0")
+
+            # Only process successful payments
+            if trade_status not in ("TRADE_SUCCESS", "TRADE_FINISHED"):
+                log.info("alipay.notify_ignored", status=trade_status, order=out_trade_no)
+                return PlainTextResponse("success")
+
+            if not api_key_mgr:
+                log.error("alipay.notify_no_key_mgr")
+                return PlainTextResponse("fail")
+
+            # Find the order
+            row = await api_key_mgr.db.fetchone(
+                "SELECT * FROM purchase_orders WHERE order_id = ?", (out_trade_no,)
+            )
+            if not row:
+                log.error("alipay.notify_order_not_found", order=out_trade_no)
+                return PlainTextResponse("success")
+
+            # Skip if already confirmed (idempotent)
+            if row["status"] == "confirmed":
+                log.info("alipay.notify_already_confirmed", order=out_trade_no)
+                return PlainTextResponse("success")
+
+            # Verify amount matches
+            expected_amount = float(row["amount"])
+            paid_amount = float(total_amount)
+            if abs(paid_amount - expected_amount) > 0.01:
+                log.error("alipay.notify_amount_mismatch", expected=expected_amount, paid=paid_amount)
+                await api_key_mgr.db.execute(
+                    "UPDATE purchase_orders SET notes = ? WHERE order_id = ?",
+                    (f"{row['notes']}\n[ALIPAY_AMOUNT_MISMATCH] expected={expected_amount} paid={paid_amount} trade_no={trade_no}", out_trade_no),
+                )
+                await api_key_mgr.db.commit()
+                return PlainTextResponse("success")
+
+            # === Auto-approve: create API key and record income ===
+            api_key = await api_key_mgr.create_key(
+                user_name=row["email"].split("@")[0],
+                email=row["email"],
+                initial_credit=row["credit"],
+                notes=f"Alipay auto-confirmed: order={out_trade_no}, trade_no={trade_no}",
+            )
+
+            await api_key_mgr.db.execute(
+                """UPDATE purchase_orders
+                   SET status = 'confirmed', api_key = ?, confirmed_at = datetime('now'),
+                       notes = ?
+                   WHERE order_id = ?""",
+                (
+                    api_key,
+                    f"{row['notes']}\n[ALIPAY_CONFIRMED] trade_no={trade_no} buyer={buyer_logon_id} amount={total_amount}",
+                    out_trade_no,
+                ),
+            )
+            await api_key_mgr.db.commit()
+
+            # Record income in ledger
+            if ledger:
+                await ledger.record_income(
+                    amount=expected_amount,
+                    category="api_key_sale",
+                    description=f"Alipay auto: {row['plan']} plan, order {out_trade_no}",
+                    counterparty=buyer_logon_id or row["email"],
+                )
+
+            log.info(
+                "alipay.notify_order_confirmed",
+                order=out_trade_no,
+                trade_no=trade_no,
+                amount=total_amount,
+                buyer=buyer_logon_id,
+            )
+            return PlainTextResponse("success")
+
+        @app.get("/api/order/{order_id}/poll")
+        async def poll_order_status(order_id: str):
+            """Poll order status — frontend calls this to check if payment completed."""
+            if not api_key_mgr:
+                return JSONResponse(status_code=501, content={"error": "Not initialized"})
+            row = await api_key_mgr.db.fetchone(
+                "SELECT order_id, status, api_key, credit FROM purchase_orders WHERE order_id = ?",
+                (order_id,),
+            )
+            if not row:
+                return JSONResponse(status_code=404, content={"error": "Order not found"})
+            result = dict(row)
+            if result["status"] != "confirmed":
+                result["api_key"] = ""
+            return result
 
         @app.post("/api/purchase/confirm")
         async def confirm_purchase(request: Request):

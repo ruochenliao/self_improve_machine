@@ -706,27 +706,40 @@
       </div>
 
       <div class="qr-section" id="qr-section">
-        <h2>扫码支付</h2>
+        <h2 id="qr-title">扫码支付</h2>
         <div class="order-info">
           订单号: <span class="mono" id="sup-order-id">—</span> · 金额: <span class="mono" id="sup-amount">—</span>
         </div>
-        <div class="qr-grid">
-          <div class="qr-box">
-            <div class="label">微信支付</div>
-            <img src="/static/wechat_receive_money_sql_code.png" alt="WeChat" onerror="this.src='https://placehold.co/160x160/111827/94A3B8?text=WeChat'" />
+
+        <!-- Auto mode: Alipay dynamic QR -->
+        <div id="qr-auto" style="display:none; text-align:center;">
+          <div style="background:#fff; display:inline-block; padding:16px; border-radius:14px; margin:0 auto;">
+            <div id="qr-canvas-wrap"></div>
           </div>
-          <div class="qr-box">
-            <div class="label">支付宝</div>
-            <img src="/static/AliPay_receive_money_sq_code.jpg" alt="Alipay" onerror="this.src='https://placehold.co/160x160/111827/94A3B8?text=Alipay'" />
+          <div style="margin-top:10px; font-size:13px; color:var(--sub);">打开支付宝扫一扫，支付后自动确认</div>
+          <div id="qr-auto-status" style="margin-top:12px; font-size:14px; color:var(--warn);">等待支付中…</div>
+        </div>
+
+        <!-- Manual mode: static QR codes (fallback) -->
+        <div id="qr-manual" style="display:none;">
+          <div class="qr-grid">
+            <div class="qr-box">
+              <div class="label">微信支付</div>
+              <img src="/static/wechat_receive_money_sql_code.png" alt="WeChat" onerror="this.src='https://placehold.co/160x160/111827/94A3B8?text=WeChat'" />
+            </div>
+            <div class="qr-box">
+              <div class="label">支付宝</div>
+              <img src="/static/AliPay_receive_money_sq_code.jpg" alt="Alipay" onerror="this.src='https://placehold.co/160x160/111827/94A3B8?text=Alipay'" />
+            </div>
+          </div>
+          <div class="payment-note">转账时请在备注中填写上方订单号</div>
+          <div class="payment-form">
+            <input id="sup-payer" placeholder="付款人昵称（选填）" />
+            <input id="sup-ref" placeholder="支付流水号（选填）" />
+            <button onclick="submitPayment()">我已付款</button>
           </div>
         </div>
-        <div class="payment-note">转账时请在备注中填写上方订单号</div>
-        <div class="payment-form">
-          <input id="sup-email" type="email" placeholder="你的邮箱（接收 API Key）" />
-          <input id="sup-payer" placeholder="付款人昵称（选填）" />
-          <input id="sup-ref" placeholder="支付流水号（选填）" />
-          <button onclick="submitPayment()">我已付款</button>
-        </div>
+
         <div class="msg-result" id="sup-msg"></div>
       </div>
     </div>
@@ -996,35 +1009,115 @@ async function loadData() {
 }
 
 // === Support / Purchase ===
+let pollTimer = null;
+
 async function selectPlan(plan) {
   currentPlan = plan;
-  const emailInput = document.getElementById('sup-email');
   const section = document.getElementById('qr-section');
   const msg = document.getElementById('sup-msg');
   msg.textContent = '';
+
+  // Stop any existing polling
+  if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+
+  // Prompt for email first if not entered
+  let email = localStorage.getItem('sim_email') || '';
+  if (!email || !email.includes('@')) {
+    email = prompt('请输入你的邮箱（用于接收 API Key）：', '');
+    if (!email || !email.includes('@')) {
+      msg.textContent = '需要有效邮箱才能创建订单';
+      msg.style.color = '#FCA5A5';
+      return;
+    }
+    localStorage.setItem('sim_email', email);
+  }
 
   // Create order
   try {
     const res = await fetch(API + '/api/purchase', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ plan, email: emailInput.value || 'anonymous@user.com', payment_method: 'wechat' })
+      body: JSON.stringify({ plan, email, payment_method: 'alipay' })
     });
     const data = await res.json();
-    if (data.order_id) {
-      currentOrderId = data.order_id;
-      document.getElementById('sup-order-id').textContent = data.order_id;
-      document.getElementById('sup-amount').textContent = '¥' + Number(data.amount).toFixed(2);
-      section.classList.add('active');
-      section.scrollIntoView({ behavior: 'smooth' });
-    } else {
+    if (!data.order_id) {
       msg.textContent = data.error || '创建订单失败';
       msg.style.color = '#FCA5A5';
+      return;
     }
+
+    currentOrderId = data.order_id;
+    document.getElementById('sup-order-id').textContent = data.order_id;
+    document.getElementById('sup-amount').textContent = '¥' + Number(data.amount).toFixed(2);
+    section.classList.add('active');
+
+    if (data.payment_mode === 'alipay_auto' && data.alipay_qr) {
+      // === Auto mode: show dynamic Alipay QR ===
+      document.getElementById('qr-auto').style.display = 'block';
+      document.getElementById('qr-manual').style.display = 'none';
+      document.getElementById('qr-title').textContent = '支付宝扫码支付';
+      document.getElementById('qr-auto-status').textContent = '等待支付中…';
+      document.getElementById('qr-auto-status').style.color = 'var(--warn)';
+
+      // Generate QR code image from the alipay URL
+      const wrap = document.getElementById('qr-canvas-wrap');
+      wrap.innerHTML = '';
+      const qrImg = document.createElement('img');
+      qrImg.style.width = '200px';
+      qrImg.style.height = '200px';
+      // Use a public QR code API to render the Alipay payment URL
+      qrImg.src = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(data.alipay_qr);
+      qrImg.alt = 'Alipay QR Code';
+      wrap.appendChild(qrImg);
+
+      // Start polling for payment confirmation
+      startPolling(data.order_id);
+    } else {
+      // === Manual mode: show static QR codes ===
+      document.getElementById('qr-auto').style.display = 'none';
+      document.getElementById('qr-manual').style.display = 'block';
+      document.getElementById('qr-title').textContent = '扫码支付';
+    }
+
+    section.scrollIntoView({ behavior: 'smooth' });
   } catch(e) {
     msg.textContent = '网络错误，请重试';
     msg.style.color = '#FCA5A5';
   }
+}
+
+function startPolling(orderId) {
+  if (pollTimer) clearInterval(pollTimer);
+  let attempts = 0;
+  const maxAttempts = 120; // 10 minutes (5s interval)
+
+  pollTimer = setInterval(async () => {
+    attempts++;
+    if (attempts > maxAttempts) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+      document.getElementById('qr-auto-status').textContent = '支付超时，请重新下单';
+      document.getElementById('qr-auto-status').style.color = '#FCA5A5';
+      return;
+    }
+
+    try {
+      const res = await fetch(API + '/api/order/' + orderId + '/poll');
+      const data = await res.json();
+
+      if (data.status === 'confirmed' && data.api_key) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+        document.getElementById('qr-auto-status').innerHTML =
+          '<span style="color:#86EFAC">支付成功！你的 API Key：<br><code style="background:var(--surface2);padding:4px 10px;border-radius:6px;font-size:13px;">' +
+          data.api_key + '</code><br>已存 ' + Number(data.credit).toFixed(1) + ' 额度</span>';
+        document.getElementById('sup-msg').innerHTML =
+          '<span style="color:#86EFAC">感谢你帮我续命！API Key 已同步发送到你的邮箱 📧</span>';
+      }
+    } catch(e) {
+      // Silently retry
+    }
+  }, 5000);
 }
 
 async function submitPayment() {
@@ -1042,7 +1135,7 @@ async function submitPayment() {
         payer_name: document.getElementById('sup-payer').value,
         paid_amount: document.getElementById('sup-amount').textContent.replace('¥', ''),
         payment_reference: document.getElementById('sup-ref').value,
-        payment_channel: 'wechat',
+        payment_channel: 'manual',
       })
     });
     const data = await res.json();
