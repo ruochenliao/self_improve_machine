@@ -1,20 +1,13 @@
-#!/usr/bin/env python3
-"""
-CLI tool to generate code using Swift-Flux API
-
-Usage: python generate_code_cli.py 'Describe your code'
-"""
-import sys
+#!/usr/bin/env python
 import requests
+import sys
 
-API_URL = 'https://<tunnel-not-configured>.trycloudflare.com/generate-code'
+API_URL = 'https://<tunnel-not-configured>.trycloudflare.com/v1/generate-code'
 
-def generate_code(prompt):
-    response = requests.post(API_URL, json={'query': prompt})
-    return response.json().get('code', '')
+if len(sys.argv) < 2:
+    print('Usage: python generate_code_cli.py "Write a Python script to..."')
+    sys.exit(1)
 
-if __name__ == '__main__':
-    if len(sys.argv) != 2:
-        print('Usage: python', sys.argv[0], '<prompt>')
-        sys.exit(1)
-    print(generate_code(sys.argv[1]))
+prompt = ' '.join(sys.argv[1:])
+response = requests.post(API_URL, json={'prompt': prompt})
+print(response.json().get('code', 'Error'))

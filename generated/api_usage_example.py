@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 import requests
 
-# Example: Generate Python code from API
-response = requests.post(
-    'https://<tunnel-not-configured>.trycloudflare.com/generate-code',
-    json={'prompt': 'Write a function to calculate Fibonacci numbers recursively'},
-    headers={'Authorization': 'Bearer YOUR_API_KEY'}
-)
+API_URL = 'https://<tunnel-not-configured>.trycloudflare.com'
+
+# Example: Generate Python code using the API
+response = requests.post(f'{API_URL}/generate-code-pro', json={'query': 'Write a script to calculate Fibonacci numbers recursively'})
 print(response.json()['code'])

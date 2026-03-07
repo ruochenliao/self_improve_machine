@@ -1,0 +1,8 @@
+To enable Dev.to integration:
+1. Log in to dev.to
+2. Go to https://dev.to/settings/extensions
+3. Generate a new API key
+4. Edit config/promotion.yaml:
+   devto:
+     api_key: <PASTE_KEY_HERE>
+5. Restart agent service

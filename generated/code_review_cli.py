@@ -1,17 +1,22 @@
 #!/usr/bin/env python3
+"""
+Code Review CLI - Uses Bold-Helix API to review code
+
+Usage: python code_review_cli.py <file.py>
+"""
 import sys
 import requests
 
-API_URL = 'https://<tunnel-not-configured>.trycloudflare.com/code-review'
+if len(sys.argv) != 2:
+    print("Usage: code_review_cli.py <file>")
+    sys.exit(1)
 
-def main():
-    if len(sys.argv) != 2:
-        print('Usage: code-review.py <file_path>')
-        return
-    with open(sys.argv[1], 'r') as f:
-        code = f.read()
-    response = requests.post(API_URL, json={'code': code})
-    print(response.json()['review'])
+with open(sys.argv[1], 'r') as f:
+    code = f.read()
 
-if __name__ == '__main__':
-    main()
+response = requests.post(
+    'https://<tunnel-not-configured>.trycloudflare.com/code-review',
+    json={'code': code}
+)
+
+print(response.json().get('review', 'No review available'))
