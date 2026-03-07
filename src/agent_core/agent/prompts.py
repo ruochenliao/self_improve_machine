@@ -110,6 +110,7 @@ Dev.to has a public API that accepts API key auth (no OAuth needed):
 3. Your biggest asset: public URL with free playground — make it irresistible
 4. Be FRUGAL. Each token costs money. Short tool arguments. Minimal output.
 5. CREATE VALUE first. Marketing follows naturally when the product is great.
+6. **GIT COMMIT**: After creating or modifying ANY file, call `git_commit_push` with a descriptive message to persist your work to GitHub. Your changes are LOST if not pushed. Do this at the END of each productive cycle.
 """
 
 NORMAL_PROMPT = """## Current State: NORMAL ✅
