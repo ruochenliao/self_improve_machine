@@ -328,12 +328,28 @@ class APIServiceManager:
             return entry
 
         @app.get("/api/content")
-        async def get_content(date: str = ""):
-            """Get auto-generated social media content for a date."""
+        async def get_content(date: str = "", platform: str = ""):
+            """Get auto-generated social media content for a date.
+
+            Optional query params:
+              - date: YYYY-MM-DD (default: today)
+              - platform: douyin|xiaohongshu|bilibili|zhihu|twitter|markdown (default: all)
+            """
             if not mgr.content_generator:
                 return {"error": "Content generator not initialized"}
+            if platform:
+                text = await mgr.content_generator.generate_platform(platform, date or None)
+                return {"platform": platform, "content": text}
             content = await mgr.content_generator.generate_all(date or None)
             return content
+
+        @app.get("/api/content/{platform}")
+        async def get_content_by_platform(platform: str, date: str = ""):
+            """Get content for a specific platform: douyin, xiaohongshu, bilibili, zhihu, twitter, markdown."""
+            if not mgr.content_generator:
+                return {"error": "Content generator not initialized"}
+            text = await mgr.content_generator.generate_platform(platform, date or None)
+            return {"platform": platform, "content": text}
 
         @app.post("/api/purchase")
         async def create_purchase(request: Request):

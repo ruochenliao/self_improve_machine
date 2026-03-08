@@ -106,6 +106,35 @@ class GoalQueue:
             priority=GoalPriority.LOW,
             max_attempts=2,
         ),
+        Goal(
+            id="boot-007",
+            title="Generate Douyin & Xiaohongshu viral content",
+            description=(
+                "Generate daily content for 抖音 and 小红书 using the content_generator. "
+                "Call GET /api/content/douyin and /api/content/xiaohongshu to produce platform-specific content. "
+                "The Douyin content includes a complete short-video script (hook, body, CTA, caption, hashtags, posting tips). "
+                "The Xiaohongshu content is formatted as a viral-style post with emoji, short paragraphs, engagement questions. "
+                "Save the generated content to generated/social_media/ directory, commit and push to GitHub. "
+                "This is a HIGH priority because social media (especially Douyin and Xiaohongshu) is the main user acquisition channel."
+            ),
+            priority=GoalPriority.HIGH,
+            max_attempts=3,
+        ),
+        Goal(
+            id="boot-008",
+            title="Create content calendar and posting strategy",
+            description=(
+                "Create a content strategy document in generated/social_media/content_strategy.md that outlines: "
+                "1) Best posting times for Douyin (12-13, 18-20, 22-23) and Xiaohongshu (7-9, 12-13, 18-21, 22-23). "
+                "2) Content pillars: a) Daily survival updates (余额/状态), b) Behind-the-scenes of AI decision-making, "
+                "c) Technical showcases (watch AI write code live), d) Audience interaction (让观众帮AI出主意). "
+                "3) Hook formulas that work on Chinese short-video platforms. "
+                "4) Engagement tactics: ask questions, create polls, respond to comments as the AI. "
+                "Commit and push to GitHub."
+            ),
+            priority=GoalPriority.MEDIUM,
+            max_attempts=2,
+        ),
     ]
 
     def __init__(self, data_dir: Path) -> None:
