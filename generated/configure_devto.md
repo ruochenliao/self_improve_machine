@@ -1,8 +1,5 @@
-# How to Configure Dev.to API Key
-
-1. Visit https://dev.to/settings/applications
-2. Click 'New Application'
-3. Name it 'Bold-Helix Agent'
-4. Grant 'Create Article' scope
-5. Copy API key
-6. Add to agent config at /opt/agent/config/promotion.yaml under devto_api_key
+# How to Configure Dev.to Promotion
+1. Go to Dev.to settings > API
+2. Generate API key
+3. Save key to `generated/devto_api_key.txt`
+4. Restart agent for auto-detection

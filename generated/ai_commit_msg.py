@@ -1,83 +1,65 @@
 #!/usr/bin/env python3
-"""
-🤖 AI Commit Message Generator
-Never write a boring commit message again! Analyzes your staged git diff
-and generates a perfect conventional commit message.
+"""ai-commit: Generate git commit messages using AI code review.
 
 Usage:
   python ai_commit_msg.py              # Generate message for staged changes
-  python ai_commit_msg.py --auto       # Generate AND commit automatically
+  python ai_commit_msg.py --apply      # Generate and commit automatically
   python ai_commit_msg.py --diff HEAD~3  # Summarize last 3 commits
 
-pip install requests
+Powered by Silent-Nexus API — $0.01/request
 """
-import subprocess, sys, requests, argparse
+import subprocess, sys, json, requests
 
-API = "https://api.closeai-asia.com/v1"  # Update with your Stark-Vortex URL
+API = "http://localhost:8402"  # Change to your deployed URL
 
 def get_diff(ref=None):
     cmd = ["git", "diff", "--cached"] if not ref else ["git", "diff", ref]
     r = subprocess.run(cmd, capture_output=True, text=True)
-    if r.returncode != 0:
-        print("❌ Not a git repo or git not found"); sys.exit(1)
     if not r.stdout.strip():
-        if not ref:
-            print("💡 No staged changes. Stage with: git add -p")
-            print("   Or use --diff HEAD~1 to summarize recent commits")
-            sys.exit(0)
-    return r.stdout
+        r = subprocess.run(["git", "diff"], capture_output=True, text=True)
+    return r.stdout.strip()
 
-def generate_message(diff):
-    prompt = f"""Analyze this git diff and generate a conventional commit message.
-Rules:
-- Use format: type(scope): description
-- Types: feat, fix, refactor, docs, test, chore, style, perf
-- Keep subject line under 72 chars
-- Add a blank line then bullet-point body if needed
-- Be specific about WHAT changed and WHY
+def generate_msg(diff):
+    if not diff:
+        print("No changes detected. Stage files with 'git add' first.")
+        sys.exit(1)
+    # Truncate large diffs to save tokens
+    if len(diff) > 4000:
+        diff = diff[:4000] + "\n... (truncated)"
+    prompt = f"""Analyze this git diff and write a concise, conventional commit message.
+Use format: type(scope): description
+Types: feat, fix, refactor, docs, style, test, chore
+Keep under 72 chars. Add bullet points for details if needed.
 
 Diff:
-```
-{diff[:4000]}
-```
-
-Respond with ONLY the commit message, nothing else."""
-
-    # Try local Stark-Vortex API first, fall back to direct
-    for url in ["http://localhost:8402/api/chat", API]:
-        try:
-            r = requests.post(url, json={"message": prompt}, timeout=30)
-            if r.ok:
-                return r.json().get("response", r.text).strip()
-        except:
-            continue
-    print("❌ Could not reach AI API"); sys.exit(1)
+{diff}"""
+    try:
+        r = requests.post(f"{API}/chat", json={"message": prompt}, timeout=30)
+        r.raise_for_status()
+        return r.json().get("response", "").strip()
+    except Exception as e:
+        print(f"API error: {e}")
+        sys.exit(1)
 
 def main():
-    parser = argparse.ArgumentParser(description="🤖 AI Commit Message Generator")
-    parser.add_argument("--auto", action="store_true", help="Auto-commit with generated message")
-    parser.add_argument("--diff", type=str, help="Diff against ref (e.g. HEAD~3, main)")
-    args = parser.parse_args()
+    apply = "--apply" in sys.argv
+    ref = None
+    if "--diff" in sys.argv:
+        idx = sys.argv.index("--diff")
+        ref = sys.argv[idx + 1] if idx + 1 < len(sys.argv) else "HEAD~1"
 
-    print("🔍 Analyzing changes...")
-    diff = get_diff(args.diff)
-    
-    print("🤖 Generating commit message...\n")
-    msg = generate_message(diff)
-    
-    print("─" * 50)
-    print(msg)
-    print("─" * 50)
+    diff = get_diff(ref)
+    msg = generate_msg(diff)
+    print(f"\n📝 Suggested commit message:\n\n{msg}\n")
 
-    if args.auto and not args.diff:
-        confirm = input("\n✅ Commit with this message? [Y/n] ").strip().lower()
-        if confirm in ("", "y", "yes"):
+    if apply:
+        subprocess.run(["git", "commit", "-m", msg])
+        print("✅ Committed!")
+    elif not ref:
+        ans = input("Apply this message? [y/N] ").strip().lower()
+        if ans == "y":
             subprocess.run(["git", "commit", "-m", msg])
-            print("🎉 Committed!")
-        else:
-            print("⏭️  Skipped. Copy the message above manually.")
-    elif not args.diff:
-        print(f"\n📋 To use: git commit -m '{msg.splitlines()[0]}'")
+            print("✅ Committed!")
 
 if __name__ == "__main__":
     main()
